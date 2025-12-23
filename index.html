@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>詩眼天涯 - 詩畫拼圖</title>
+    
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 引入 Babel 用於解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 引入 Tailwind CSS 用於樣式 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- 自定義樣式 -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #f7f3e8;
+        }
+
+        @keyframes stampIn {
+            0% { transform: scale(3) rotate(-12deg); opacity: 0; }
+            100% { transform: scale(1) rotate(-12deg); opacity: 0.8; }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        .animate-stamp {
+            animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .animate-pulse-ring {
+            animation: pulse-ring 1s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        .writing-vertical-rl {
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+        }
+
+        /* 隱藏滾動條但保留功能 */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // -----------------------------------------------------------------------------
+        // 音效工具
+        // -----------------------------------------------------------------------------
+        const playDingSound = () => {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                
+                const ctx = new AudioContext();
+                const oscillator = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(ctx.destination);
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(1200, ctx.currentTime); // 高音
+                gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+
+                oscillator.start();
+                oscillator.stop(ctx.currentTime + 0.5);
+            } catch (e) {
+                console.error("Audio play failed", e);
+            }
+        };
+
+        // -----------------------------------------------------------------------------
+        // 圖標組件
+        // -----------------------------------------------------------------------------
+        const Icon = ({ path, className, size = 24 }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Sparkles: (props) => <Icon {...props} path={<><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 9h4"/><path d="M3 5h4"/></>} />,
+            ArrowRight: (props) => <Icon {...props} path={<><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></>} />,
+            RotateCcw: (props) => <Icon {...props} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>} />,
+            BookOpen: (props) => <Icon {...props} path={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>} />,
+            Info: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></>} />,
+            Award: (props) => <Icon {...props} path={<><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></>} />,
+            Image: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></>} />,
+            Search: (props) => <Icon {...props} path={<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>} />,
+            Play: (props) => <Icon {...props} path={<polygon points="5 3 19 12 5 21 5 3"/>} />,
+        };
+
+        // -----------------------------------------------------------------------------
+        // 遊戲數據：關卡配置
+        // -----------------------------------------------------------------------------
+        const LEVELS = [
+            {
+                id: 1,
+                title: "第一關：登鸛雀樓詩句排列",
+                imageUrl: "登鸛雀樓.png", 
+                correctImageUrl: "登鸛雀樓正確圖.png",
+                desc: "白日依山盡，黃河入海流。——王之渙《登鸛雀樓》",
+                pieceImages: [
+                    "白日依山盡.png", 
+                    "黃河入海流.png", 
+                    "欲窮千里目.png", 
+                    "更上一層樓.png" 
+                ],
+                // 大家來找碴配置 (1個大小 = 5%)
+                mistakes: [
+                    // m1: 往左移動5公分 (x: 45->30)
+                    { id: 'm1', x: 30, y: 15, r: 20, explanation: "太陽要依靠著山勢隱沒" }, 
+                    // m2: 之前已往上 (64, 84)
+                    { id: 'm2', x: 64, y: 84, r: 20, explanation: "主人翁在鸛雀樓上方俯視山河風光" }, 
+                    // m3: 之前已往左上 (27, 81)
+                    { id: 'm3', x: 27, y: 81, r: 45, explanation: "黃河的水是滾滾黃水" }  
+                ]
+            },
+            {
+                id: 2,
+                title: "第二關：黃鶴樓送孟浩然之廣陵",
+                imageUrl: "黃鶴樓送孟浩然之廣陵.png",
+                correctImageUrl: "黃鶴樓送孟浩然之廣陵正確圖.png",
+                desc: "故人西辭黃鶴樓，煙花三月下揚州。——李白《黃鶴樓送孟浩然之廣陵》",
+                pieceImages: [
+                    "故人西辭黃鶴樓.png", 
+                    "煙花三月下揚州.png", 
+                    "孤帆遠影碧山盡.png", 
+                    "唯見長江天際流.png" 
+                ],
+                // 大家來找碴配置
+                mistakes: [
+                    // m1: 往左上移動1.5公分 (約4.5%) -> x: 56-4.5=51.5, y: 70-4.5=65.5
+                    { id: 'm1', x: 51.5, y: 65.5, r: 30, explanation: "遠行者和送別者角色互換" },
+                    // m2: 之前已變大且往右 (63, 91, r:30)
+                    { id: 'm2', x: 63, y: 91, r: 30, explanation: "蓮花是夏天盛開才對，現在時序春天三月" }
+                ]
+            },
+            {
+                id: 3,
+                title: "第三關：楓橋夜泊",
+                imageUrl: "楓橋夜泊.png",
+                correctImageUrl: "楓橋夜泊正確圖.png",
+                desc: "月落烏啼霜滿天，江楓漁火對愁眠。——張繼《楓橋夜泊》",
+                pieceImages: [
+                    "月落烏啼霜滿天.png",
+                    "江楓漁火對愁眠.png",
+                    "姑蘇城外寒山寺.png",
+                    "夜半鐘聲到客船.png"
+                ],
+                // 大家來找碴配置
+                mistakes: [
+                    // m1: 往左2公分 (x: 42->36), 之前已擴大(r:30)
+                    { id: 'm1', x: 36, y: 83, r: 30, explanation: "主人翁行旅在外幽未眠" },
+                    // m2: 之前已擴大並往下 (55, 61, r:30)
+                    { id: 'm2', x: 55, y: 61, r: 30, explanation: "江面上不應有熱鬧的遊船" }
+                ]
+            }
+        ];
+
+        // -----------------------------------------------------------------------------
+        // 輔助組件：印章 (Seal)
+        // -----------------------------------------------------------------------------
+        const Seal = ({ text, className }) => (
+            <div className={`relative flex items-center justify-center border-4 border-red-700 rounded-lg p-2 w-24 h-24 rotate-[-12deg] opacity-0 animate-stamp ${className}`}>
+                <div className="absolute inset-0 border border-red-700 m-1 rounded-sm opacity-60"></div>
+                <span className="text-red-700 font-bold text-4xl font-serif writing-vertical-rl select-none">
+                    {text}
+                </span>
+            </div>
+        );
+
+        // -----------------------------------------------------------------------------
+        // 主應用組件
+        // -----------------------------------------------------------------------------
+        function App() {
+            const [level, setLevel] = useState(0);
+            const [pool, setPool] = useState([]);
+            const [grid, setGrid] = useState([null, null, null, null]);
+            const [selectedPiece, setSelectedPiece] = useState(null); 
+            
+            // gameState: video_intro(開頭影音), intro(封面), playing(拼圖中), spotting(找碴中), won(本關完全結束), end(全破)
+            const [gameState, setGameState] = useState('video_intro'); 
+            
+            // 找碴模式狀態
+            const [foundMistakes, setFoundMistakes] = useState([]);
+            const imageContainerRef = useRef(null);
+            
+            // 背景音樂 Ref
+            const bgmRef = useRef(null);
+
+            // 初始化背景音樂
+            useEffect(() => {
+                bgmRef.current = new Audio('山河鼓心.mp3');
+                bgmRef.current.loop = true;
+                return () => {
+                    if (bgmRef.current) {
+                        bgmRef.current.pause();
+                        bgmRef.current = null;
+                    }
+                };
+            }, []);
+
+            // 監聽遊戲狀態變更，處理封面音樂播放
+            useEffect(() => {
+                if (gameState === 'intro') {
+                    if (bgmRef.current) {
+                        bgmRef.current.play().catch(error => {
+                            console.log("Auto play failed on intro start (likely browser policy), waiting for interaction.", error);
+                        });
+                    }
+                }
+            }, [gameState]);
+
+            // 初始設定與重置
+            useEffect(() => {
+                if (gameState !== 'intro' && gameState !== 'video_intro') {
+                    loadLevel(level);
+                }
+            }, [level]);
+
+            const startGame = () => {
+                // 播放背景音樂 (如果尚未播放)
+                if (bgmRef.current && bgmRef.current.paused) {
+                    bgmRef.current.play().catch(error => {
+                        console.log("Audio play failed, user interaction needed first.", error);
+                    });
+                }
+                // 從第一關開始，並初始化
+                loadLevel(0);
+            };
+
+            const stopGame = () => {
+                // 回到封面，不停止音樂，重置進度
+                if (bgmRef.current) {
+                    // 音樂重頭開始或繼續播放視需求而定，這裡重置時間讓封面更有感覺
+                    bgmRef.current.currentTime = 0;
+                    if(bgmRef.current.paused) {
+                         bgmRef.current.play().catch(e => console.error(e));
+                    }
+                }
+                setLevel(0);
+                setGameState('intro');
+            }
+
+            const loadLevel = (lvlIndex) => {
+                if (lvlIndex >= LEVELS.length) {
+                    setGameState('end');
+                    return;
+                }
+                
+                const levelData = LEVELS[lvlIndex];
+                
+                const pieces = [0, 1, 2, 3].map(pos => ({
+                    id: `p-${lvlIndex}-${pos}`,
+                    correctPos: pos,
+                    customImg: levelData.pieceImages ? levelData.pieceImages[pos] : null,
+                    bgPos: getBgPos(pos)
+                }));
+
+                let shuffled = [...pieces];
+                let attempts = 0;
+                do {
+                    shuffled.sort(() => Math.random() - 0.5);
+                    attempts++;
+                } while (JSON.stringify(shuffled) === JSON.stringify(pieces) && attempts < 10);
+
+                setPool(shuffled);
+                setGrid([null, null, null, null]);
+                setSelectedPiece(null);
+                setFoundMistakes([]);
+                setGameState('playing');
+            };
+
+            const getBgPos = (index) => {
+                const x = (index % 2) * 100;
+                const y = Math.floor(index / 2) * 100;
+                return `${x}% ${y}%`;
+            };
+
+            // 修改標籤為「第X句」
+            const getSlotLabel = (index) => {
+                switch(index) {
+                    case 0: return "第一句";
+                    case 1: return "第二句";
+                    case 2: return "第三句";
+                    case 3: return "第四句";
+                    default: return "";
+                }
+            };
+
+            const handlePoolClick = (piece) => {
+                if (gameState !== 'playing') return;
+                
+                if (selectedPiece && selectedPiece.id === piece.id) {
+                    setSelectedPiece(null);
+                } else {
+                    setSelectedPiece(piece);
+                }
+            };
+
+            const handleGridClick = (index) => {
+                if (gameState !== 'playing') return;
+
+                const currentPieceInSlot = grid[index];
+
+                if (selectedPiece) {
+                    const newGrid = [...grid];
+                    const newPool = pool.filter(p => p.id !== selectedPiece.id);
+
+                    if (currentPieceInSlot) {
+                        newPool.push(currentPieceInSlot);
+                    }
+
+                    newGrid[index] = selectedPiece;
+
+                    setGrid(newGrid);
+                    setPool(newPool);
+                    setSelectedPiece(null);
+
+                    checkWin(newGrid);
+                } 
+                else if (currentPieceInSlot) {
+                    const newGrid = [...grid];
+                    newGrid[index] = null;
+                    const newPool = [...pool, currentPieceInSlot];
+                    setGrid(newGrid);
+                    setPool(newPool);
+                }
+            };
+
+            const checkWin = (currentGrid) => {
+                const isFull = currentGrid.every(p => p !== null);
+                if (!isFull) return;
+
+                const isCorrect = currentGrid.every((p, index) => p.correctPos === index);
+                
+                if (isCorrect) {
+                    // 如果這關有設定找碴，進入找碴模式
+                    if (LEVELS[level].mistakes && LEVELS[level].mistakes.length > 0) {
+                        setGameState('spotting');
+                    } else {
+                        // 否則直接勝利
+                        setGameState('won');
+                    }
+                }
+            };
+
+            // 處理找碴點擊
+            const handleSpottingClick = (e) => {
+                if (gameState !== 'spotting') return;
+                
+                const currentLevelData = LEVELS[level];
+                if (!currentLevelData.mistakes) return;
+
+                const rect = e.target.getBoundingClientRect();
+                
+                // 計算點擊位置 (px)
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                // 檢查是否點到錯誤區塊
+                let hit = false;
+                currentLevelData.mistakes.forEach(mistake => {
+                    // 已經找過的就不算了
+                    if (foundMistakes.includes(mistake.id)) return;
+
+                    // 將錯誤位置從百分比轉換為像素
+                    const targetX = (mistake.x / 100) * rect.width;
+                    const targetY = (mistake.y / 100) * rect.height;
+
+                    // 計算像素距離
+                    const dist = Math.sqrt(Math.pow(clickX - targetX, 2) + Math.pow(clickY - targetY, 2));
+                    
+                    // 視覺上的寬度是 (r*4) px，所以半徑是 (r*2) px
+                    // 我們使用這個像素半徑來進行嚴格判定
+                    const radiusPx = (mistake.r || 10) * 2;
+
+                    if (dist <= radiusPx) {
+                        playDingSound();
+                        const newFound = [...foundMistakes, mistake.id];
+                        setFoundMistakes(newFound);
+                        hit = true;
+
+                        // 檢查是否找完所有錯誤
+                        if (newFound.length === currentLevelData.mistakes.length) {
+                            setTimeout(() => {
+                                setGameState('won');
+                            }, 1000); // 延遲一下讓玩家看到最後一個圈圈
+                        }
+                    }
+                });
+            };
+
+            const nextLevel = () => {
+                setLevel(level + 1);
+            };
+
+            const resetLevel = () => {
+                loadLevel(level);
+            };
+
+            const currentLevelData = LEVELS[level] || LEVELS[0];
+
+            const renderPiece = (piece, isSelected = false) => {
+                const style = piece.customImg 
+                    ? {
+                        backgroundImage: `url(${piece.customImg})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat'
+                      }
+                    : {
+                        backgroundImage: `url(${currentLevelData.imageUrl})`,
+                        backgroundSize: '200% 200%',
+                        backgroundPosition: piece.bgPos,
+                        backgroundRepeat: 'no-repeat'
+                      };
+
+                return (
+                    <div 
+                        className={`w-full aspect-video rounded-md shadow-sm border-2 transition-all duration-300 relative overflow-hidden bg-stone-200
+                            ${isSelected ? 'border-yellow-600 ring-2 ring-yellow-400 scale-105 z-10' : 'border-stone-300 hover:border-stone-400'}
+                        `}
+                        style={style}
+                    >
+                    </div>
+                );
+            };
+
+            // -------------------------------------------------------------------------
+            // 頁面渲染
+            // -------------------------------------------------------------------------
+
+            // 0. 開頭影片 (Video Intro)
+            if (gameState === 'video_intro') {
+                return (
+                    <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+                        <video 
+                            src="eyemovie.mp4" 
+                            className="w-full h-full object-contain" 
+                            autoPlay 
+                            controls
+                            onEnded={() => setGameState('intro')}
+                        >
+                            您的瀏覽器不支援影片標籤。
+                        </video>
+                        <button 
+                            onClick={() => setGameState('intro')}
+                            className="absolute top-5 right-5 text-white/80 border border-white/30 hover:border-white px-4 py-2 rounded-full hover:bg-white/10 transition-all z-50 text-sm tracking-widest"
+                        >
+                            跳過影片
+                        </button>
+                    </div>
+                );
+            }
+
+            // 1. 封面 (Intro) - 滿版設計
+            if (gameState === 'intro') {
+                return (
+                    <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-stone-100 font-serif relative overflow-hidden">
+                        
+                        {/* 滿版封面背景圖 */}
+                        <div className="absolute inset-0 z-0">
+                            <img 
+                                src="詩眼天涯.png" 
+                                alt="詩眼天涯封面" 
+                                className="w-full h-full object-cover opacity-100"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "https://placehold.co/1920x1080/3f3f46/a1a1aa?text=詩眼天涯"; // 備用圖
+                                }}
+                            />
+                            {/* 遮罩層增加文字可讀性 */}
+                            <div className="absolute inset-0 bg-black/40"></div>
+                        </div>
+
+                        <div className="relative z-10 max-w-2xl w-full text-center space-y-12 animate-fade-in">
+                            
+                            <h1 className="text-6xl font-bold text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-[0.5em] mb-4">
+                                詩眼天涯
+                            </h1>
+
+                            {/* 開始按鈕 */}
+                            <div>
+                                <button 
+                                    onClick={startGame}
+                                    className="bg-stone-100/90 text-stone-900 px-16 py-5 rounded-full text-2xl hover:bg-white hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center gap-3 mx-auto tracking-widest font-bold backdrop-blur-sm"
+                                >
+                                    <Icons.Play size={32} fill="currentColor" /> 遊戲開始
+                                </button>
+                            </div>
+
+                            {/* 說明文字 */}
+                            <div className="bg-black/60 p-6 rounded-lg border border-white/20 backdrop-blur-md max-w-lg mx-auto text-stone-100 shadow-xl">
+                                <p className="text-lg font-bold mb-2 flex items-center justify-center gap-2 text-yellow-400">
+                                    <Icons.Info size={20} /> 遊戲說明
+                                </p>
+                                <p className="leading-relaxed tracking-wide">
+                                    請將詩句圖片正確排列後，接下來完整構圖找出錯誤的地方。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 2. 結束畫面 (End)
+            if (gameState === 'end') {
+                return (
+                    <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-stone-100 font-serif relative overflow-hidden">
+                         
+                        {/* 背景圖：與封面一致 */}
+                        <div className="absolute inset-0 z-0">
+                            <img 
+                                src="詩眼天涯.png" 
+                                alt="詩眼天涯封面" 
+                                className="w-full h-full object-cover opacity-100"
+                                onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = "https://placehold.co/1920x1080/3f3f46/a1a1aa?text=詩眼天涯"; // 備用圖
+                                }}
+                            />
+                            <div className="absolute inset-0 bg-black/40"></div>
+                        </div>
+
+                        <div className="relative z-10 max-w-md w-full text-center space-y-8 animate-fade-in">
+                            <h1 className="text-5xl font-bold text-white mb-4 tracking-widest drop-shadow-md">詩眼天涯</h1>
+                            <div className="bg-black/60 p-8 rounded-lg shadow-xl border border-white/20 backdrop-blur-md text-stone-100">
+                                <div className="mx-auto mb-4 text-yellow-400 flex justify-center">
+                                    <Icons.Award size={64} />
+                                </div>
+                                <p className="text-xl mb-6 font-bold">恭喜您！已完成所有畫卷修復。</p>
+                                <p className="text-stone-300 mb-8">詩情畫意，盡在眼中。</p>
+                                <button 
+                                    onClick={stopGame}
+                                    className="bg-white/90 text-stone-900 px-8 py-3 rounded-full text-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mx-auto font-bold"
+                                >
+                                    <Icons.RotateCcw size={20} /> 重頭再來
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 3. 遊戲主畫面 (Playing / Spotting / Won)
+            return (
+                <div className="min-h-screen text-stone-800 font-serif flex flex-col relative overflow-hidden">
+                    {/* 背景裝飾 */}
+                    <div className="absolute top-0 right-0 w-64 h-64 opacity-5 pointer-events-none select-none">
+                        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="#292524" d="M45.7,-76.3C58.9,-69.3,69.1,-55.6,76.5,-41.2C83.9,-26.8,88.5,-11.7,85.8,2.2C83.1,16.1,73.1,28.8,63.4,40.4C53.7,52,44.3,62.5,32.8,68.9C21.3,75.3,7.7,77.6,-5.3,86.1C-18.3,94.6,-30.7,109.3,-41.2,107.5C-51.7,105.7,-60.3,87.4,-67.6,71.7C-74.9,56,-80.9,42.9,-83.4,29.3C-85.9,15.7,-84.9,1.6,-80.7,-10.8C-76.5,-23.2,-69.1,-33.9,-59.7,-42.6C-50.3,-51.3,-38.9,-58,-27.4,-66.2C-15.9,-74.4,-4.3,-84.1,8.2,-87.3C20.7,-90.5,41.4,-87.2,45.7,-76.3Z" transform="translate(100 100)" />
+                        </svg>
+                    </div>
+
+                    {/* 頂部導航 */}
+                    <header className="p-4 flex justify-between items-center border-b border-stone-300 bg-white/50 backdrop-blur-sm z-10 shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <Icons.Image className="text-stone-700" size={24} />
+                            <h1 className="text-xl font-bold tracking-widest text-stone-900">詩眼天涯</h1>
+                        </div>
+                        <div className="text-stone-500 text-sm font-sans flex items-center gap-1">
+                            <span>第 {level + 1} / {LEVELS.length} 關</span>
+                        </div>
+                    </header>
+
+                    {/* 修改 max-w-lg 為 max-w-4xl 以放大整體區域 */}
+                    <main className="flex-1 flex flex-col items-center p-4 max-w-4xl mx-auto w-full z-10 gap-6">
+                        
+                        {/* 標題區 */}
+                        <div className="text-center w-full">
+                            <h2 className="text-2xl font-bold text-stone-800 mb-1">{currentLevelData.title}</h2>
+                            <p className="text-xl text-stone-600 font-bold font-sans">
+                                {gameState === 'spotting' ? `拼圖完成！請在圖中找出 ${currentLevelData.mistakes.length} 個錯誤之處` : "請將下方破碎唐詩畫面依序置入對應位置以修復詩作"}
+                            </p>
+                        </div>
+
+                        {/* 遊戲核心區域 */}
+                        <div className="w-full relative shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-stone-100">
+                            
+                            {/* 狀態：WON (全關卡完成顯示，或找碴後的過場) */}
+                            {gameState === 'won' ? (
+                                <div className="w-full aspect-video relative animate-fade-in">
+                                    <img 
+                                        /* 這裡進行判斷：如果有 correctImageUrl 則顯示正確圖，否則顯示原圖 */
+                                        src={currentLevelData.correctImageUrl || currentLevelData.imageUrl} 
+                                        alt="Complete" 
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/10"></div>
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
+                                        <Seal text="絕妙" />
+                                    </div>
+                                    
+                                    {/* 下一關按鈕覆蓋層 */}
+                                    <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                                         <button 
+                                            onClick={nextLevel}
+                                            className="bg-stone-900/90 text-white px-6 py-2 rounded-full hover:bg-black transition-all flex items-center gap-2 shadow-lg backdrop-blur-sm"
+                                        >
+                                            下一關 <Icons.ArrowRight size={18} />
+                                        </button>
+                                    </div>
+                                    
+                                    {/* 詩詞賞析覆蓋層 */}
+                                    <div className="absolute top-4 left-4 right-4 bg-white/80 backdrop-blur-md p-3 rounded text-center text-sm font-bold text-stone-800 border border-stone-200">
+                                        {currentLevelData.desc}
+                                    </div>
+                                </div>
+                            ) : gameState === 'spotting' ? (
+                                /* 狀態：SPOTTING (大家來找碴) */
+                                <div className="w-full aspect-video relative animate-fade-in cursor-crosshair group">
+                                    <img 
+                                        src={currentLevelData.imageUrl} 
+                                        alt="Spot Difference" 
+                                        className="w-full h-full object-cover"
+                                        onClick={handleSpottingClick}
+                                    />
+                                    
+                                    {/* 這裡移除了原本的測試/提示框 (yellow dashed)，
+                                        現在玩家在點擊前看不到任何提示區域。
+                                    */}
+
+                                    {/* 顯示已找到的錯誤（紅色實線框）與說明文字 */}
+                                    {foundMistakes.map(id => {
+                                        const mistake = currentLevelData.mistakes.find(m => m.id === id);
+                                        return (
+                                            <React.Fragment key={id}>
+                                                <div 
+                                                    className="absolute border-4 border-red-500 rounded-full animate-pulse-ring box-border"
+                                                    style={{
+                                                        left: `${mistake.x}%`,
+                                                        top: `${mistake.y}%`,
+                                                        width: `${(mistake.r || 10) * 4}px`, // 動態大小
+                                                        height: `${(mistake.r || 10) * 4}px`,
+                                                        transform: 'translate(-50%, -50%)',
+                                                        pointerEvents: 'none' // 讓點擊能穿透
+                                                    }}
+                                                />
+                                                {/* 說明文字框 */}
+                                                <div 
+                                                    className="absolute text-white bg-black/80 px-3 py-2 rounded-md text-xs font-bold border border-white/30 shadow-lg whitespace-nowrap z-50 animate-fade-in pointer-events-none"
+                                                    style={{
+                                                        left: `${mistake.x}%`,
+                                                        top: `${mistake.y}%`,
+                                                        transform: 'translate(-50%, -150%)' // 往上偏移顯示
+                                                    }}
+                                                >
+                                                    {mistake.explanation}
+                                                    {/* 小箭頭裝飾 */}
+                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/80"></div>
+                                                </div>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                    
+                                    <div className="absolute top-2 right-2 bg-stone-900/80 text-white px-3 py-1 rounded-full text-xs font-sans backdrop-blur-sm border border-white/20">
+                                        已找到: {foundMistakes.length} / {currentLevelData.mistakes.length}
+                                    </div>
+                                </div>
+                            ) : (
+                                /* 狀態：PLAYING (拼圖進行中) */
+                                <div className="grid grid-cols-2 gap-0.5 bg-stone-300 border border-stone-300">
+                                    {grid.map((piece, index) => (
+                                        <div 
+                                            key={`slot-${index}`}
+                                            onClick={() => handleGridClick(index)}
+                                            className={`aspect-video bg-stone-100 relative flex items-center justify-center cursor-pointer overflow-hidden transition-colors
+                                                ${!piece && selectedPiece ? 'hover:bg-yellow-50/50' : ''}
+                                            `}
+                                        >
+                                            {piece ? (
+                                                renderPiece(piece, false)
+                                            ) : (
+                                                <span className="text-stone-300 font-bold text-lg select-none tracking-widest">
+                                                    {getSlotLabel(index)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 控制按鈕 (僅在拼圖進行中顯示) */}
+                        {gameState === 'playing' && (
+                            <div className="flex justify-end w-full">
+                                <button 
+                                    onClick={resetLevel}
+                                    className="text-stone-500 hover:text-stone-800 text-sm flex items-center gap-1 transition-colors"
+                                >
+                                    <Icons.RotateCcw size={14} /> 重置本關
+                                </button>
+                            </div>
+                        )}
+
+                        {/* 備選圖片區 (Pool) */}
+                        {gameState === 'playing' && (
+                            <div className="w-full space-y-2">
+                                <div className="text-stone-500 text-xs font-sans ml-1">吉光片羽：</div>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {pool.map((piece) => (
+                                        <div 
+                                            key={piece.id}
+                                            onClick={() => handlePoolClick(piece)}
+                                            className="cursor-pointer group relative flex flex-col items-center"
+                                        >
+                                            {renderPiece(piece, selectedPiece && selectedPiece.id === piece.id)}
+                                            
+                                            {/* 已移除詩句/檔名標籤 */}
+                                        </div>
+                                    ))}
+                                    {Array.from({ length: 4 - pool.length }).map((_, i) => (
+                                        <div key={`empty-${i}`} className="aspect-video bg-stone-200/50 rounded-md border-2 border-dashed border-stone-200"></div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* 找碴模式下的提示 */}
+                        {gameState === 'spotting' && (
+                             <div className="text-stone-500 text-sm animate-pulse">
+                                提示：點擊畫面中不合理的地方
+                            </div>
+                        )}
+
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
