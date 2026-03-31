@@ -149,12 +149,12 @@
                 ],
                 // 大家來找碴配置 (1個大小 = 5%)
                 mistakes: [
-                    // m1: 往左移動5公分 (x: 45->30)
-                    { id: 'm1', x: 30, y: 15, r: 20, explanation: "太陽要依靠著山勢隱沒" }, 
-                    // m2: 之前已往上 (64, 84)
-                    { id: 'm2', x: 64, y: 84, r: 20, explanation: "主人翁在鸛雀樓上方俯視山河風光" }, 
-                    // m3: 之前已往左上 (27, 81)
-                    { id: 'm3', x: 27, y: 81, r: 45, explanation: "黃河的水是滾滾黃水" }  
+                    // m1: 往右上方移動1公分 (+3% x, -3% y)，並將觸發區域稍微縮小
+                    { id: 'm1', x: 30, y: 9, r: 25, explanation: "太陽要依靠著山勢隱沒" }, 
+                    // m2: 往右上方移動1公分 (+3% x, -3% y)，並將觸發區域稍微縮小
+                    { id: 'm2', x: 61, y: 78, r: 25, explanation: "主人翁在鸛雀樓上方俯視山河風光" }, 
+                    // m3: 往右上方移動1公分 (+3% x, -3% y)，並將觸發區域稍微縮小
+                    { id: 'm3', x: 24, y: 72, r: 35, explanation: "黃河的水是滾滾黃水" }  
                 ]
             },
             {
@@ -171,10 +171,10 @@
                 ],
                 // 大家來找碴配置
                 mistakes: [
-                    // m1: 往左上移動1.5公分 (約4.5%) -> x: 56-4.5=51.5, y: 70-4.5=65.5
-                    { id: 'm1', x: 51.5, y: 65.5, r: 30, explanation: "遠行者和送別者角色互換" },
-                    // m2: 之前已變大且往右 (63, 91, r:30)
-                    { id: 'm2', x: 63, y: 91, r: 30, explanation: "蓮花是夏天盛開才對，現在時序春天三月" }
+                    // m1: 往左上移動2公分 (-6%)
+                    { id: 'm1', x: 45.5, y: 53.5, r: 30, explanation: "遠行者和送別者角色互換" },
+                    // m2: 往右移動1公分 (x 從 55.5 移至 58.5)，並稍微加大
+                    { id: 'm2', x: 58.5, y: 85, r: 35, explanation: "蓮花是夏天盛開才對，現在時序春天三月" }
                 ]
             },
             {
@@ -191,10 +191,10 @@
                 ],
                 // 大家來找碴配置
                 mistakes: [
-                    // m1: 往左2公分 (x: 42->36), 之前已擴大(r:30)
-                    { id: 'm1', x: 36, y: 83, r: 30, explanation: "主人翁行旅在外幽未眠" },
-                    // m2: 之前已擴大並往下 (55, 61, r:30)
-                    { id: 'm2', x: 55, y: 61, r: 30, explanation: "江面上不應有熱鬧的遊船" }
+                    // m1: 往左上移動2公分 (-6%)
+                    { id: 'm1', x: 30, y: 77, r: 30, explanation: "主人翁行旅在外幽未眠" },
+                    // m2: 往左上移動2公分 (-6%)
+                    { id: 'm2', x: 49, y: 55, r: 30, explanation: "江面上不應有熱鬧的遊船" }
                 ]
             }
         ];
@@ -540,6 +540,9 @@
                                 <p className="leading-relaxed tracking-wide">
                                     請將詩句圖片正確排列後，接下來完整構圖找出錯誤的地方。
                                 </p>
+                                <p className="mt-4 pt-4 border-t border-white/30 text-sm text-stone-300 font-bold tracking-widest text-center">
+                                    林威宇老師X南一書局製作
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -681,7 +684,7 @@
                                                 />
                                                 {/* 說明文字框 */}
                                                 <div 
-                                                    className="absolute text-white bg-black/80 px-3 py-2 rounded-md text-xs font-bold border border-white/30 shadow-lg whitespace-nowrap z-50 animate-fade-in pointer-events-none"
+                                                    className="absolute text-white bg-black/80 px-4 py-3 rounded-lg text-base font-bold border border-white/30 shadow-lg whitespace-nowrap z-50 animate-fade-in pointer-events-none"
                                                     style={{
                                                         left: `${mistake.x}%`,
                                                         top: `${mistake.y}%`,
