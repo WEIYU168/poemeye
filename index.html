@@ -3,66 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>詩眼天涯 - 詩畫拼圖</title>
-    
-    <!-- 引入 React 和 ReactDOM -->
+    <title>東坡行旅 - 貶謫路線互動地圖</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- 引入 Babel 用於解析 JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- 引入 Tailwind CSS 用於樣式 -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- 自定義樣式 -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+TC:wght@400;700&display=swap');
         
         body {
             font-family: 'Noto Serif TC', serif;
-            background-color: #f7f3e8;
-        }
-
-        @keyframes stampIn {
-            0% { transform: scale(3) rotate(-12deg); opacity: 0; }
-            100% { transform: scale(1) rotate(-12deg); opacity: 0.8; }
+            background-color: #f0ebe5;
         }
         
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .font-calligraphy {
+            font-family: 'Ma Shan Zheng', cursive;
         }
 
-        @keyframes pulse-ring {
-            0% { transform: scale(0.8); opacity: 0.5; }
-            100% { transform: scale(1.5); opacity: 0; }
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
         }
-
-        .animate-stamp {
-            animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
         }
-
-        .animate-fade-in {
-            animation: fadeIn 0.5s ease-out forwards;
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #8b5cf6;
+            border-radius: 3px;
         }
-
-        .animate-pulse-ring {
-            animation: pulse-ring 1s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        
+        /* Quiz Animation */
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
         }
-
-        .writing-vertical-rl {
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-        }
-
-        /* 隱藏滾動條但保留功能 */
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-        }
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        .animate-pop-in {
+            animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
     </style>
 </head>
@@ -70,706 +46,1120 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
+        
+        // 页面加载提示
+        console.log('=== 東坡行旅游戏已加载 ===');
+        console.log('提示：如需使用背景音乐和个性化地图，请确保文件与index.html在同一目录');
 
-        // -----------------------------------------------------------------------------
-        // 音效工具
-        // -----------------------------------------------------------------------------
-        const playDingSound = () => {
+        // 音效工具函數
+        let globalAudioCtx = null;
+
+        const playSound = (type) => {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!AudioContext) return;
                 
-                const ctx = new AudioContext();
-                const oscillator = ctx.createOscillator();
-                const gainNode = ctx.createGain();
+                if (!globalAudioCtx) {
+                    globalAudioCtx = new AudioContext();
+                }
+                const ctx = globalAudioCtx;
+                
+                if (ctx.state === 'suspended') {
+                    ctx.resume().catch(e => console.log("Audio resume blocked"));
+                }
 
-                oscillator.connect(gainNode);
-                gainNode.connect(ctx.destination);
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc.connect(gain);
+                gain.connect(ctx.destination);
 
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(1200, ctx.currentTime); // 高音
-                gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                const now = ctx.currentTime;
 
-                oscillator.start();
-                oscillator.stop(ctx.currentTime + 0.5);
+                if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0.001, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'win') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.1);
+                    osc.frequency.setValueAtTime(783.99, now + 0.2);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.linearRampToValueAtTime(0.001, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                } else if (type === 'tick') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(800, now);
+                    gain.gain.setValueAtTime(0.05, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'firework') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(100, now);
+                    osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                }
             } catch (e) {
-                console.error("Audio play failed", e);
+                // Ignore audio errors
             }
         };
 
-        // -----------------------------------------------------------------------------
-        // 圖標組件
-        // -----------------------------------------------------------------------------
-        const Icon = ({ path, className, size = 24 }) => (
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width={size} 
-                height={size} 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className={className}
-            >
-                {path}
-            </svg>
-        );
+        const Fireworks = () => {
+            const canvasRef = useRef(null);
 
-        const Icons = {
-            Sparkles: (props) => <Icon {...props} path={<><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M9 3v4"/><path d="M3 9h4"/><path d="M3 5h4"/></>} />,
-            ArrowRight: (props) => <Icon {...props} path={<><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></>} />,
-            RotateCcw: (props) => <Icon {...props} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>} />,
-            BookOpen: (props) => <Icon {...props} path={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>} />,
-            Info: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></>} />,
-            Award: (props) => <Icon {...props} path={<><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></>} />,
-            Image: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></>} />,
-            Search: (props) => <Icon {...props} path={<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>} />,
-            Play: (props) => <Icon {...props} path={<polygon points="5 3 19 12 5 21 5 3"/>} />,
-        };
-
-        // -----------------------------------------------------------------------------
-        // 遊戲數據：關卡配置
-        // -----------------------------------------------------------------------------
-        const LEVELS = [
-            {
-                id: 1,
-                title: "第一關：登鸛雀樓詩句排列",
-                imageUrl: "登鸛雀樓.png", 
-                correctImageUrl: "登鸛雀樓正確圖.png",
-                desc: "白日依山盡，黃河入海流。——王之渙《登鸛雀樓》",
-                pieceImages: [
-                    "白日依山盡.png", 
-                    "黃河入海流.png", 
-                    "欲窮千里目.png", 
-                    "更上一層樓.png" 
-                ],
-                // 大家來找碴配置 (1個大小 = 5%)
-                mistakes: [
-                    // m1: 往右上方移動1公分 (+3% x, -3% y)，並將觸發區域稍微縮小
-                    { id: 'm1', x: 30, y: 9, r: 25, explanation: "太陽要依靠著山勢隱沒" }, 
-                    // m2: 往右上方移動1公分 (+3% x, -3% y)，並將觸發區域稍微縮小
-                    { id: 'm2', x: 61, y: 78, r: 25, explanation: "主人翁在鸛雀樓上方俯視山河風光" }, 
-                    // m3: 往右上方移動1公分 (+3% x, -3% y)，並將觸發區域稍微縮小
-                    { id: 'm3', x: 24, y: 72, r: 35, explanation: "黃河的水是滾滾黃水" }  
-                ]
-            },
-            {
-                id: 2,
-                title: "第二關：黃鶴樓送孟浩然之廣陵",
-                imageUrl: "黃鶴樓送孟浩然之廣陵.png",
-                correctImageUrl: "黃鶴樓送孟浩然之廣陵正確圖.png",
-                desc: "故人西辭黃鶴樓，煙花三月下揚州。——李白《黃鶴樓送孟浩然之廣陵》",
-                pieceImages: [
-                    "故人西辭黃鶴樓.png", 
-                    "煙花三月下揚州.png", 
-                    "孤帆遠影碧山盡.png", 
-                    "唯見長江天際流.png" 
-                ],
-                // 大家來找碴配置
-                mistakes: [
-                    // m1: 往左上移動2公分 (-6%)
-                    { id: 'm1', x: 45.5, y: 53.5, r: 30, explanation: "遠行者和送別者角色互換" },
-                    // m2: 往右移動1公分 (x 從 55.5 移至 58.5)，並稍微加大
-                    { id: 'm2', x: 58.5, y: 85, r: 35, explanation: "蓮花是夏天盛開才對，現在時序春天三月" }
-                ]
-            },
-            {
-                id: 3,
-                title: "第三關：楓橋夜泊",
-                imageUrl: "楓橋夜泊.png",
-                correctImageUrl: "楓橋夜泊正確圖.png",
-                desc: "月落烏啼霜滿天，江楓漁火對愁眠。——張繼《楓橋夜泊》",
-                pieceImages: [
-                    "月落烏啼霜滿天.png",
-                    "江楓漁火對愁眠.png",
-                    "姑蘇城外寒山寺.png",
-                    "夜半鐘聲到客船.png"
-                ],
-                // 大家來找碴配置
-                mistakes: [
-                    // m1: 往左上移動2公分 (-6%)
-                    { id: 'm1', x: 30, y: 77, r: 30, explanation: "主人翁行旅在外幽未眠" },
-                    // m2: 往左上移動2公分 (-6%)
-                    { id: 'm2', x: 49, y: 55, r: 30, explanation: "江面上不應有熱鬧的遊船" }
-                ]
-            }
-        ];
-
-        // -----------------------------------------------------------------------------
-        // 輔助組件：印章 (Seal)
-        // -----------------------------------------------------------------------------
-        const Seal = ({ text, className }) => (
-            <div className={`relative flex items-center justify-center border-4 border-red-700 rounded-lg p-2 w-24 h-24 rotate-[-12deg] opacity-0 animate-stamp ${className}`}>
-                <div className="absolute inset-0 border border-red-700 m-1 rounded-sm opacity-60"></div>
-                <span className="text-red-700 font-bold text-4xl font-serif writing-vertical-rl select-none">
-                    {text}
-                </span>
-            </div>
-        );
-
-        // -----------------------------------------------------------------------------
-        // 主應用組件
-        // -----------------------------------------------------------------------------
-        function App() {
-            const [level, setLevel] = useState(0);
-            const [pool, setPool] = useState([]);
-            const [grid, setGrid] = useState([null, null, null, null]);
-            const [selectedPiece, setSelectedPiece] = useState(null); 
-            
-            // gameState: video_intro(開頭影音), intro(封面), playing(拼圖中), spotting(找碴中), won(本關完全結束), end(全破)
-            const [gameState, setGameState] = useState('video_intro'); 
-            
-            // 找碴模式狀態
-            const [foundMistakes, setFoundMistakes] = useState([]);
-            const imageContainerRef = useRef(null);
-            
-            // 背景音樂 Ref
-            const bgmRef = useRef(null);
-
-            // 初始化背景音樂
             useEffect(() => {
-                bgmRef.current = new Audio('山河鼓心.mp3');
-                bgmRef.current.loop = true;
-                return () => {
-                    if (bgmRef.current) {
-                        bgmRef.current.pause();
-                        bgmRef.current = null;
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                let particles = [];
+                let animationId;
+
+                const createParticle = (x, y, color) => {
+                    const particleCount = 30;
+                    playSound('firework');
+                    
+                    for (let i = 0; i < particleCount; i++) {
+                        particles.push({
+                            x, y,
+                            color,
+                            radius: Math.random() * 3 + 1,
+                            velocity: {
+                                x: (Math.random() - 0.5) * 8,
+                                y: (Math.random() - 0.5) * 8
+                            },
+                            life: 100,
+                            alpha: 1
+                        });
                     }
+                };
+
+                const animate = () => {
+                    animationId = requestAnimationFrame(animate);
+                    ctx.clearRect(0, 0, canvas.width, canvas.height); 
+
+                    particles.forEach((p, index) => {
+                        if (p.life > 0) {
+                            ctx.beginPath();
+                            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                            ctx.fillStyle = `rgba(${p.color}, ${p.alpha})`;
+                            ctx.fill();
+                            p.x += p.velocity.x;
+                            p.y += p.velocity.y;
+                            p.life--;
+                            p.alpha -= 0.01;
+                        } else {
+                            particles.splice(index, 1);
+                        }
+                    });
+
+                    if (Math.random() < 0.05) {
+                        const x = Math.random() * canvas.width;
+                        const y = Math.random() * canvas.height * 0.6;
+                        const colors = ['255, 99, 71', '60, 179, 113', '100, 149, 237', '255, 215, 0', '255, 105, 180'];
+                        const color = colors[Math.floor(Math.random() * colors.length)];
+                        createParticle(x, y, color);
+                    }
+                };
+
+                const resize = () => {
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+                };
+
+                window.addEventListener('resize', resize);
+                resize();
+                animate();
+
+                return () => {
+                    window.removeEventListener('resize', resize);
+                    cancelAnimationFrame(animationId);
                 };
             }, []);
 
-            // 監聽遊戲狀態變更，處理封面音樂播放
-            useEffect(() => {
-                if (gameState === 'intro') {
-                    if (bgmRef.current) {
-                        bgmRef.current.play().catch(error => {
-                            console.log("Auto play failed on intro start (likely browser policy), waiting for interaction.", error);
-                        });
-                    }
-                }
-            }, [gameState]);
+            return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[60] bg-transparent" />;
+        };
 
-            // 初始設定與重置
-            useEffect(() => {
-                if (gameState !== 'intro' && gameState !== 'video_intro') {
-                    loadLevel(level);
+        const ScoreBoard = ({ score }) => {
+            const maxScore = 20;
+            const lights = [...Array(maxScore)].map((_, i) => i);
+
+            return (
+                <div className="flex flex-col items-center animate-pop-in pointer-events-auto">
+                    <div className="bg-[#fcfaf5] text-stone-600 text-[10px] md:text-xs px-1 py-1 rounded-t border-x border-t border-stone-300 font-bold tracking-widest whitespace-nowrap shadow-sm w-full text-center">
+                        文采值
+                    </div>
+                    <div className="bg-[#fcfaf5]/90 backdrop-blur p-1 pb-1.5 rounded-b shadow-lg border border-stone-300 flex flex-col-reverse gap-[2px] w-full items-center">
+                        {lights.map((i) => {
+                            const isActive = i < score;
+                            return (
+                                <div 
+                                    key={i}
+                                    className={`w-4 h-1.5 md:w-5 md:h-2 rounded-[1px] transition-all duration-300 border border-stone-300
+                                        ${isActive 
+                                            ? 'bg-pink-400 shadow-[0_0_5px_#f472b6] border-pink-500' 
+                                            : 'bg-stone-200 opacity-40'
+                                        }
+                                    `}
+                                />
+                            );
+                        })}
+                    </div>
+                    <div className="mt-2 bg-[#fcfaf5] text-pink-500 font-mono text-xl md:text-2xl font-bold px-3 py-1 rounded border border-stone-300 shadow-inner">
+                        {String(score).padStart(2, '0')}
+                    </div>
+                </div>
+            );
+        };
+
+        const LuckyWheel = ({ onComplete, isActive }) => {
+            const [rotation, setRotation] = useState(0);
+            const [isSpinning, setIsSpinning] = useState(false);
+            const [result, setResult] = useState(null);
+            const [isClosed, setIsClosed] = useState(false);
+
+            const prizes = [
+                { name: '牡蠣', color: '#f1f5f9', text: '#334155', score: 2, desc: '吃完牡蠣後用幽默的口吻叮囑兒子不要聲張，怕其他官員也跑來搶食，這顯示了他樂觀豁達的性格和對美食的熱愛。' },
+                { name: '螃蟹', color: '#fee2e2', text: '#991b1b', score: 1, desc: '海南島四面環海，肥美的螃蟹是贈別的好禮。' },
+                { name: '黎族釀酒', color: '#fef3c7', text: '#92400e', score: 1, desc: '「華夷兩樽合，醉笑一歡同。」東坡與黎族朋友共飲真一酒，不分漢夷，情感真摯。' },
+                { name: '檳榔', color: '#dcfce7', text: '#166534', score: -2, desc: '初嘗幾口後，不久即吐之，全身發熱冒汗不適，過了幾個時辰才好。' }
+            ];
+
+            const spinToPrize = () => {
+                if (isSpinning || result) return;
+                setIsSpinning(true);
+                const prizeIndex = Math.floor(Math.random() * 4);
+                const segmentAngle = 360 / 4;
+                const offset = segmentAngle / 2;
+                const rotateAngle = 360 - (prizeIndex * segmentAngle + offset);
+                const targetRotation = 1800 + rotateAngle; 
+                setRotation(targetRotation);
+                
+                let spinTime = 0;
+                const spinInterval = setInterval(() => {
+                    spinTime += 100;
+                    if (spinTime < 3800) { 
+                        playSound('tick');
+                    } else {
+                        clearInterval(spinInterval);
+                    }
+                }, 150); 
+
+                setTimeout(() => {
+                    setIsSpinning(false);
+                    const selectedPrize = prizes[prizeIndex];
+                    setResult(selectedPrize);
+                    if (selectedPrize.score > 0) playSound('correct');
+                    else playSound('wrong');
+                    onComplete(selectedPrize.score);
+                }, 4000);
+            };
+
+            if (isClosed) return null;
+
+            return (
+                <div className={`fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm ${!isActive ? 'hidden' : ''}`}>
+                    <div className="relative animate-pop-in flex flex-col items-center gap-5 bg-gradient-to-b from-[#fdfbf7] to-[#f4ecd8] p-6 md:p-8 rounded-2xl shadow-[0_15px_50px_rgba(0,0,0,0.5)] border-4 border-amber-700 w-[22rem] md:w-[26rem] max-h-[95vh] overflow-y-auto custom-scrollbar">
+                        <h3 className="text-3xl font-bold text-amber-900 font-calligraphy drop-shadow-sm">轉盤抽好禮</h3>
+                        
+                        <div className="relative w-[220px] h-[220px] shrink-0">
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[24px] border-t-red-600 z-20 filter drop-shadow-md"></div>
+                            
+                            <div 
+                                className="w-full h-full rounded-full border-[6px] border-amber-900 shadow-[0_4px_10px_rgba(0,0,0,0.3)] overflow-hidden transition-transform duration-[4000ms] ease-[cubic-bezier(0.17,0.67,0.12,0.99)]"
+                                style={{ 
+                                    transform: `rotate(${rotation}deg)`,
+                                    background: `conic-gradient(${prizes[0].color} 0deg 90deg, ${prizes[1].color} 90deg 180deg, ${prizes[2].color} 180deg 270deg, ${prizes[3].color} 270deg 360deg)`
+                                }}
+                            >
+                                {prizes.map((p, i) => (
+                                    <div key={i} className="absolute top-0 left-0 w-full h-full flex justify-center pt-5 font-bold font-serif text-lg text-stone-800 drop-shadow-sm" style={{ transform: `rotate(${i * 90 + 45}deg)`, color: p.text }}>
+                                        {p.name}
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <button 
+                                onClick={spinToPrize} 
+                                disabled={isSpinning || result} 
+                                className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full border-[3px] border-amber-300 flex items-center justify-center text-white font-bold text-2xl shadow-[0_4px_10px_rgba(0,0,0,0.4)] z-30 transition-transform font-calligraphy ${result ? 'bg-stone-500 cursor-default' : 'bg-red-700 hover:bg-red-600 hover:scale-110 cursor-pointer active:scale-95'}`}
+                            >
+                                {result ? '完' : '按'}
+                            </button>
+                        </div>
+
+                        {result ? (
+                            <div className="bg-white p-4 rounded-xl shadow-sm border border-amber-300 w-full animate-pop-in text-center mt-2">
+                                <div className="text-xl font-bold mb-2 text-stone-800 font-calligraphy">獲得：{result.name}</div>
+                                <p className="text-sm text-stone-600 leading-relaxed font-serif text-justify mb-3">{result.desc}</p>
+                                <div className={`font-bold text-sm py-2 rounded mb-3 ${result.score > 0 ? 'text-green-700 bg-green-100' : 'text-red-600 bg-red-100'}`}>
+                                    文采值 {result.score > 0 ? '+' : ''}{result.score} !
+                                </div>
+                                <button 
+                                    onClick={() => setIsClosed(true)} 
+                                    className="w-full bg-amber-700 text-white font-bold py-2.5 rounded-lg hover:bg-amber-800 transition-colors shadow-md text-base"
+                                >
+                                    收下並繼續
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="bg-amber-900 text-amber-50 px-5 py-2.5 rounded-full text-sm font-bold shadow-md w-full text-center mt-2">
+                                點擊中央「按」字抽取海南名產
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const RockPaperScissors = ({ onWin, onLose, isActive }) => {
+            const [gameState, setGameState] = useState('start'); 
+            const [playerChoice, setPlayerChoice] = useState(null);
+            const [computerChoice, setComputerChoice] = useState(null);
+
+            const choices = [
+                { id: 'rock', icon: '✊', beats: 'scissors' },
+                { id: 'paper', icon: '✋', beats: 'rock' },
+                { id: 'scissors', icon: '✌️', beats: 'paper' }
+            ];
+
+            const playGame = (choiceId) => {
+                if (gameState !== 'start') return;
+
+                setPlayerChoice(choiceId);
+                
+                const playerChoiceObj = choices.find(c => c.id === choiceId);
+                const choicePlayerBeats = playerChoiceObj.beats;
+                const choicePlayerLosesTo = choices.find(c => c.beats === choiceId).id;
+                
+                let randomChoiceId;
+                const rand = Math.random();
+                if (rand < 0.6) {
+                    randomChoiceId = choicePlayerBeats; // 玩家贏 60%
+                } else if (rand < 0.8) {
+                    randomChoiceId = choiceId; // 平手 20%
+                } else {
+                    randomChoiceId = choicePlayerLosesTo; // 玩家輸 20%
                 }
-            }, [level]);
+                
+                setComputerChoice(randomChoiceId);
+
+                if (choiceId === randomChoiceId) {
+                    setGameState('draw');
+                } else if (playerChoiceObj.beats === randomChoiceId) {
+                    setGameState('win');
+                    playSound('win');
+                } else {
+                    setGameState('lose');
+                    playSound('wrong');
+                }
+            };
+
+            const resetRound = () => {
+                setGameState('start');
+                setPlayerChoice(null);
+                setComputerChoice(null);
+            };
+
+            if (!isActive) return null;
+
+            return (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="relative bg-gradient-to-br from-stone-800 to-stone-900 p-5 md:p-6 rounded-2xl shadow-[0_15px_50px_rgba(0,0,0,0.6)] border-4 border-red-900 w-[18rem] md:w-[24rem] text-center animate-pop-in max-h-[95vh] overflow-y-auto custom-scrollbar">
+                        <h3 className="text-2xl md:text-3xl text-red-500 font-calligraphy mb-4 drop-shadow-md">⚠️ 路遇劫匪 ⚠️</h3>
+                        
+                        {gameState === 'start' && (
+                            <>
+                                <div className="bg-stone-950/50 p-3 rounded-lg border border-stone-700 mb-5 shadow-inner">
+                                    <p className="text-stone-300 text-sm md:text-base font-serif">「此路是我開！想過此路，先贏過我手中的拳頭！」</p>
+                                </div>
+                                <div className="flex justify-center gap-3 md:gap-5">
+                                    {choices.map(c => (
+                                        <button 
+                                            key={c.id} 
+                                            onClick={() => playGame(c.id)} 
+                                            className="w-16 h-16 md:w-20 md:h-20 text-3xl md:text-4xl bg-gradient-to-t from-stone-700 to-stone-600 hover:from-stone-600 hover:to-stone-500 flex items-center justify-center rounded-2xl transition-all transform hover:-translate-y-2 hover:shadow-[0_10px_20px_rgba(0,0,0,0.4)] active:scale-95 border-2 border-stone-500 shadow-lg"
+                                        >
+                                            {c.icon}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        {(gameState === 'win' || gameState === 'lose' || gameState === 'draw') && (
+                            <div className="animate-pop-in">
+                                <div className="flex justify-center items-center gap-6 md:gap-8 text-4xl md:text-5xl mb-6 bg-stone-950/40 p-4 rounded-2xl border border-stone-700 shadow-inner">
+                                    <div className="text-center flex flex-col items-center">
+                                        <span className="block text-xs font-bold text-stone-400 mb-2 bg-stone-800 px-2 py-0.5 rounded-full shadow-sm">你</span>
+                                        <span className="drop-shadow-lg">{choices.find(c => c.id === playerChoice)?.icon}</span>
+                                    </div>
+                                    <div className="text-red-500 font-black text-2xl md:text-3xl italic drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">VS</div>
+                                    <div className="text-center flex flex-col items-center">
+                                        <span className="block text-xs font-bold text-stone-400 mb-2 bg-stone-800 px-2 py-0.5 rounded-full shadow-sm">劫匪</span>
+                                        <span className="drop-shadow-lg">{choices.find(c => c.id === computerChoice)?.icon}</span>
+                                    </div>
+                                </div>
+                                
+                                {gameState === 'draw' && (
+                                    <div className="bg-amber-900/40 border border-amber-700/50 p-4 rounded-xl">
+                                        <p className="text-amber-400 text-lg md:text-xl font-bold mb-3">平手！再來一次！</p>
+                                        <button onClick={resetRound} className="bg-amber-600 text-white px-6 py-2 text-base rounded-full font-bold hover:bg-amber-500 shadow-[0_0_15px_rgba(217,119,6,0.4)] transition-all">再戰</button>
+                                    </div>
+                                )}
+                                {gameState === 'win' && (
+                                    <div className="bg-green-900/40 border border-green-700/50 p-4 rounded-xl">
+                                        <p className="text-green-400 text-lg md:text-xl font-bold mb-1">贏了！劫匪落荒而逃！</p>
+                                        <p className="text-green-200/70 text-xs mb-4">文采值 +1 (壓驚)</p>
+                                        <button onClick={onWin} className="bg-green-600 text-white px-6 py-2 text-base rounded-full font-bold hover:bg-green-500 shadow-[0_0_15px_rgba(22,163,74,0.4)] transition-all">繼續旅程</button>
+                                    </div>
+                                )}
+                                {gameState === 'lose' && (
+                                    <div className="bg-red-900/40 border border-red-700/50 p-4 rounded-xl">
+                                        <p className="text-red-400 text-lg md:text-xl font-bold mb-1">輸了！盤纏被搶光...</p>
+                                        <p className="text-red-200/70 text-xs mb-4">大俠請重新來過</p>
+                                        <button onClick={onLose} className="bg-red-700 text-white px-6 py-2 text-base rounded-full font-bold hover:bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.4)] transition-all">重新開始</button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // 地點與測驗數據 (更新座標微調)
+        const LOCATIONS = [
+            { id: 'start', name: '起點', x: 90, y: 10, desc: '請上傳地圖並點擊「開始行旅」。蘇軾的一生，是詩意與苦難交織的旅程。', poem: '人生到處知何似，應似飛鴻踏雪泥。' },
+            { id: 'mizhou', name: '密州', x: 63, y: 7, year: '1075-1076年 (40-41歲)', desc: '任密州知州。在此地文風大變，作風豪放。同時也寫下感人至深的悼亡詞。', poem: '會挽雕弓如滿月，西北望，射天狼。', quizzes: [
+                { 
+                    question: '「老夫聊發少年狂，左牽黃，右擎蒼...」在《江城子·密州出獵》中，蘇軾用「親射虎，看孫郎」的典故，展現了何種氣概？', 
+                    options: ['感嘆年華老去，力不從心', '渴望建功立業，英武豪邁', '描寫田園狩獵的悠閒', '諷刺朝廷重文輕武'], 
+                    answer: 1, 
+                    explanation: '正確！詞中「會挽雕弓如滿月，西北望，射天狼」一句，將自己比作三國孫權，表達了渴望為國戍邊、抗擊敵人的豪情壯志。',
+                    extraLearning: { title: '原文賞析：《江城子·密州出獵》', content: '老夫聊發少年狂，左牽黃，右擎蒼，錦帽貂裘，千騎卷平岡。\n為報傾城隨太守，親射虎，看孫郎。\n酒酣胸膽尚開張。鬢微霜，又何妨！\n持節雲中，何日遣馮唐？\n會挽雕弓如滿月，西北望，射天狼。\n\n【典故補充】\n孫郎即三國時代的孫權。據《三國志》記載，孫權曾騎馬射虎，雖然馬匹被老虎抓傷，但他臨危不亂，用雙戟擊退了老虎。蘇軾以此自比，展現武將般的豪放之氣。' }
+                },
+                { 
+                    question: '「十年生死兩茫茫，不思量，自難忘。」這首名垂千古的悼亡詞，是蘇軾夢見誰之後所作？', 
+                    options: ['弟弟蘇轍', '恩師歐陽修', '亡妻王弗', '侍妾朝雲'], 
+                    answer: 2, 
+                    explanation: '答對了。這首詞寫得字字血淚，「相顧無言，惟有淚千行」，表達了對結髮妻子王弗深沉的思念與哀傷。',
+                    extraLearning: { title: '原文賞析：《江城子·乙卯正月二十日夜記夢》', content: '十年生死兩茫茫，不思量，自難忘。\n千里孤墳，無處話淒涼。\n縱使相逢應不識，塵滿面，鬢如霜。\n\n夜來幽夢忽還鄉，小軒窗，正梳妝。\n相顧無言，惟有淚千行。\n料得年年腸斷處，明月夜，短松岡。\n\n【背景補充】\n這首詞作於王弗過世十年後。王弗生前聰明賢淑，蘇軾在密州夢見亡妻在故鄉的「短松岡」梳妝，醒來後寫下這首淒美動人的千古第一悼亡詞。' }
+                }
+            ]},
+            { id: 'xuzhou', name: '徐州', x: 71, y: 16, year: '1077年 (42歲)', desc: '任徐州知州。黃河決口，蘇軾親率軍民築堤抗洪。', poem: '暮雲收盡溢清寒，銀漢無聲轉玉盤。', quizzes: [
+                { 
+                    question: '蘇軾在徐州寫下《中秋月》：「暮雲收盡溢清寒，銀漢無聲轉玉盤。」請問「玉盤」在此處運用了什麼修辭，指代什麼？', 
+                    options: ['誇飾法，指代盛食物的盤子', '借代法，指代滿月', '擬人法，指代美人', '譬喻法，指代湖面'], 
+                    answer: 1, 
+                    explanation: '沒錯。蘇軾以「玉盤」借代潔白圓滿的月亮。這首詩描寫了他與弟弟蘇轍久別重逢共度中秋的清景。',
+                    extraLearning: { title: '原文賞析：《中秋月》', content: '暮雲收盡溢清寒，銀漢無聲轉玉盤。\n此生此夜不長好，明月明年何處看。\n\n【背景補充】\n蘇軾與弟弟蘇轍（子由）感情極佳，但兩人各自為官，長達七年未曾相聚。這一年中秋，兄弟倆終於在徐州團聚。詩中透露出雖然當下團圓美好，但對未來聚散無常卻充滿了無限的感慨。' }
+                }
+            ]},
+            { id: 'huzhou', name: '湖州', x: 73, y: 31, year: '1079年 (44歲)', desc: '任湖州知州僅三個月，爆發著名的「烏臺詩案」。', poem: '眼見青山，身在牢籠。此去一別，不知何日歸。', quizzes: [
+                { 
+                    question: '蘇軾在上書《湖州謝表》時，因那句「愚不適時，難以追陪新進」，被新黨指控為什麼罪名？', 
+                    options: ['貪汙受賄', '文字訕謗朝政', '私通敵國', '怠忽職守'], 
+                    answer: 1, 
+                    explanation: '正確。這句話被解讀為諷刺新法和新進官員，成為「烏臺詩案」文字獄的導火線。',
+                    extraLearning: { title: '歷史背景：烏臺詩案', content: '蘇軾在《湖州謝表》中寫道：「知其愚不適時，難以追陪新進；察其老不生事，或能牧養小民。」\n\n「新進」一詞被新黨視為諷刺王安石變法提拔的官員。加上他平常愛在詩裡發牢騷（如「讀書萬卷不讀律，致君堯舜知無術」），最終被羅織罪名。因御史臺常有烏鴉棲息又稱「烏臺」，此事件便被稱為烏臺詩案。' }
+                }
+            ]},
+            { id: 'bianjing', name: '汴京', x: 48, y: 14, year: '1079年', desc: '北宋京城（今開封）。蘇軾被關押於御史台監獄（烏臺），生死未卜。', poem: '聖主如天萬物春，小臣愚暗自亡身。', quizzes: [
+                { 
+                    question: '蘇軾獄中絕筆詩：「與君世世為兄弟，更結來生未了因。」其中的「君」指的是誰？這句詩體現了什麼？', 
+                    options: ['宋神宗；忠君愛國', '王安石；政治和解', '蘇轍；深厚手足情', '黃庭堅；文人相惜'], 
+                    answer: 2, 
+                    explanation: '是的。蘇軾以為必死無疑，最放不下的就是弟弟蘇轍，這兩句詩展現了中國文學史上最感人的兄弟情誼。',
+                    extraLearning: { title: '原文賞析：《獄中寄子由二首·其一》', content: '聖主如天萬物春，小臣愚暗自亡身。\n百年未滿先償債，十口無歸更累人。\n是處青山可埋骨，他年夜雨獨傷神。\n與君世世為兄弟，更結來生未了因。\n\n【獄中送魚】\n蘇軾入獄時與長子蘇邁約定，平時送飯，若判死刑就送「魚」。某天朋友代送飯不知情送了魚，蘇軾以為死期將至，悲痛寫下此詩與弟弟訣別，字字血淚。' }
+                },
+                { 
+                    question: '【思辨】蘇軾從「文壇領袖」淪為「階下囚」，這種巨大的落差，對一位創作者而言，往往會帶來什麼影響？', 
+                    options: ['從此噤若寒蟬，不再創作', '風格轉向諂媚，尋求翻身', '生命體驗更深刻，作品更具穿透力', '放棄文學，轉而經商'], 
+                    answer: 2, 
+                    explanation: '【思辨解析】苦難往往是文學的養分。這次劫難雖然摧毀了他的政治前途，卻洗鍊了他的靈魂，為後來黃州時期的巔峰創作奠定了基礎。',
+                    extraLearning: { title: '思辨延伸：苦難與轉化', content: '經過烏臺詩案的生死邊緣，蘇軾的文學風格發生了深刻的轉變。\n\n從過去銳利鋒芒的入世關懷，逐漸揉合了道家的曠達與佛家的超脫。如他後來在黃州所寫的《卜算子》：「揀盡寒枝不肯棲，寂寞沙洲冷。」這股由極致痛苦淬鍊出的力量，成就了名垂千古的「東坡居士」。' }
+                }
+            ]},
+            { id: 'robbery_event', name: '突發：路遇劫匪', type: 'rps', x: 53, y: 28, year: '貶謫途中', desc: '貶謫黃州途中，路途凶險，竟遇山賊攔路！', poem: '此路是我開，留下買路財！' },
+            { id: 'huangzhou', name: '黃州', x: 58, y: 39, year: '1079-1084年 (44-49歲)', desc: '貶為黃州團練副使。此時期是文學巔峰，寫下《赤壁賦》、《定風波》等。', poem: '大江東去，浪淘盡，千古風流人物。', quizzes: [
+                { 
+                    question: '詞句賞析：「莫聽穿林打葉聲，何妨吟嘯且徐行。」這首《定風波》傳達了蘇軾怎樣的人生態度？', 
+                    options: ['面對風雨的驚慌失措', '歸隱山林的消極避世', '任憑風雨、處變不驚的曠達', '期待天氣放晴的焦慮'], 
+                    answer: 2, 
+                    explanation: '正確！「一蓑煙雨任平生」道盡了他面對政治風暴與人生逆境時，那種泰然自若、超然物外的豁達胸襟。',
+                    extraLearning: { title: '原文賞析：《定風波》', content: '莫聽穿林打葉聲，何妨吟嘯且徐行。\n竹杖芒鞋輕勝馬，誰怕？一蓑煙雨任平生。\n料峭春風吹酒醒，微冷，山頭斜照卻相迎。\n回首向來蕭瑟處，歸去，也無風雨也無晴。\n\n【背景補充】\n蘇軾在黃州沙湖買田遇雨，同行皆狼狽，唯他泰然自若。「風雨」既是自然界的風雨，也是他政治生涯的狂風暴雨，他用腳步丈量，將一切化為平淡。' }
+                },
+                { 
+                    question: '【思辨】《赤壁賦》中「逝者如斯，而未嘗往也」，蘇軾透過水與月的變與不變，解決了什麼內心矛盾？', 
+                    options: ['個人渺小與宇宙永恆的對立', '貧窮與富貴的差距', '仕途升遷的快慢', '朋友聚散的無常'], 
+                    answer: 0, 
+                    explanation: '【思辨解析】他領悟到，若從變的角度看，天地萬物無時不變；從不變的角度看，物與我皆無盡。這種哲學思考讓他超越了個人的得失與短暫。',
+                    extraLearning: { title: '原文賞析：《前赤壁賦》節錄', content: '「客亦知夫水與月乎？逝者如斯，而未嘗往也；盈虛者如彼，而卒莫消長也。蓋將自其變者而觀之，則天地曾不能以一瞬；自其不變者而觀之，則物與我皆無盡也，而又何羨乎！」\n\n【哲理解析】\n看著江水流逝卻未枯竭，月亮盈虧卻未增減。他領悟到，人也是宇宙的一部分，既然宇宙永恆，那融入宇宙的人自然也是永恆的。這種大氣魄徹底治癒了他的苦悶。' }
+                }
+            ]},
+            { id: 'special_event_1', name: '突發事件：蘇仙與佛印', type: 'special', x: 65, y: 29, year: '趣事軼聞', desc: '蘇軾與好友佛印禪師同遊。佛印將寫有東坡詩詞的扇子扔入水中，戲稱「水流東坡詩（屍）」。東坡看到岸邊狗在啃骨頭，反擊道：「狗啃河上（和尚）骨」。兩人相視大笑，展現文人雅趣。', poem: '狗啃河上（和尚）骨，水流東坡詩（屍）。', quizzes: [
+                { 
+                    question: '佛印禪師將寫有蘇軾詩句的扇子丟進水裡，戲稱「水流東坡詩」，是利用了哪個字的諧音來調侃蘇軾？', 
+                    options: ['師（老師）', '失（遺失）', '屍（屍體）', '施（布施）'], 
+                    answer: 2, 
+                    explanation: '正確。佛印利用「詩」與「屍」同音，開玩笑說蘇東坡像水上的浮屍，這是兩人之間無傷大雅的玩笑。',
+                    extraLearning: { title: '軼聞補充：蘇東坡與佛印', content: '蘇軾一生愛交朋友，其中與金山寺的佛印禪師交情最為人津津樂道。兩人常常互相鬥智、鬥嘴，留下了許多如「八風吹不動，一屁打過江」等充滿禪機與幽默的故事，展現了蘇軾平易近人的一面。' }
+                },
+                { 
+                    question: '蘇軾不甘示弱，指著岸邊正在啃骨頭的狗，回應「狗啃河上骨」，這裡的「河上」是指代什麼？', 
+                    options: ['河面上的東西', '和尚（指佛印）', '喝湯', '闔上'], 
+                    answer: 1, 
+                    explanation: '答對了！蘇軾機智地利用「河上」與「和尚」的諧音，反擊佛印像那根被狗啃的骨頭，展現了極佳的急智。',
+                    extraLearning: { title: '軼聞補充：文人機智', content: '這種利用諧音雙關語的對答，在中國文學史上非常常見，被稱為「打機鋒」。它不僅考驗反應速度，更展現了文人之間深厚的語言功底與幽默感，也印證了兩人超越世俗的深厚友誼。' }
+                }
+            ]},
+            { id: 'hangzhou', name: '杭州', x: 77, y: 41, year: '1089年', desc: '舊地重遊，疏浚西湖。', poem: '欲把西湖比西子，淡妝濃抹總相宜。', quizzes: [
+                { 
+                    question: '「欲把西湖比西子，淡妝濃抹總相宜。」蘇軾這句詩運用了絕妙的譬喻，請問「西子」是指？', 
+                    options: ['西邊的女子', '美女西施', '西王母', '西湖的別稱'], 
+                    answer: 1, 
+                    explanation: '沒錯。蘇軾將西湖比作古代美女西施，形容西湖無論晴天（淡妝）或雨天（濃抹），都有其獨特的美感。',
+                    extraLearning: { title: '原文賞析：《飲湖上初晴後雨》', content: '水光瀲灩晴方好，山色空濛雨亦奇。\n欲把西湖比西子，淡妝濃抹總相宜。\n\n【歷史貢獻：蘇堤春曉】\n蘇軾在杭州任職期間，除了寫下無數讚美西湖的詩詞，更重要的是他為了解決水患與農溉問題，動員了數十萬人疏濬西湖，並用挖出的泥土築成了一道貫穿南北的長堤，這就是著名的「蘇堤」。' }
+                }
+            ]},
+            { id: 'huizhou', name: '惠州', x: 56, y: 68, year: '1094年 (59歲)', desc: '年近六十，再貶惠州。', poem: '日啖荔枝三百顆，不辭長作嶺南人。', quizzes: [
+                { 
+                    question: '「日啖荔枝三百顆，不辭長作嶺南人。」這句詩表面寫愛吃荔枝，實則反映了蘇軾哪種心境？', 
+                    options: ['貪圖口腹之慾', '隨遇而安，苦中作樂', '後悔來到嶺南', '樂不思蜀，忘記故鄉'], 
+                    answer: 1, 
+                    explanation: '正確。在當時嶺南是蠻荒瘴癘之地，蘇軾能說出「不辭長作嶺南人」，展現了他極強的適應力與樂觀精神。',
+                    extraLearning: { title: '原文賞析：《食荔枝》', content: '羅浮山下四時春，盧橘楊梅次第新。\n日啖荔枝三百顆，不辭長作嶺南人。\n\n【背景補充】\n宋代的嶺南仍被視為偏遠未開化的「蠻荒之地」。許多被貶謫至此的官員都因水土不服而死，蘇軾卻靠著幽默感與對當地風物的熱愛，硬是把苦難生活過成了詩。' }
+                },
+                { 
+                    question: '【思辨】蘇軾曾引用柔奴的話：「此心安處是吾鄉」。這與下列哪句西方諺語有異曲同工之妙？', 
+                    options: ['條條大路通羅馬', '家是心之所在 (Home is where the heart is)', '羅馬不是一天造成的', '時間就是金錢'], 
+                    answer: 1, 
+                    explanation: '【思辨解析】兩者都強調了「家」的定義不在於地理位置，而在於內心的歸屬感與安寧。',
+                    extraLearning: { title: '原文賞析：《定風波·南海歸贈王定國侍人寓娘》', content: '常羨人間琢玉郎，天應乞與點酥娘。\n盡道清歌傳皓齒，風起，雪飛炎海變清涼。\n萬里歸來顏愈少，微笑，笑時猶帶嶺梅香。\n試問嶺南應不好，卻道：此心安處是吾鄉。\n\n【典故補充】\n柔奴是好友王鞏的歌女。王鞏被烏臺詩案牽連貶至嶺南，柔奴不離不棄。北歸後蘇軾問她嶺南風土如何？她平靜回答：「此心安處，便是吾鄉。」讓蘇軾大為感動。' }
+                }
+            ]},
+            { id: 'danzhou', name: '儋州', x: 40, y: 84, year: '1097年 (62歲)', desc: '貶至海南島儋州。', poem: '九死南荒吾不恨，茲遊奇絕冠平生。', quizzes: [
+                { 
+                    question: '「九死南荒吾不恨，茲遊奇絕冠平生。」蘇軾將這次流放視為「奇絕」的遊歷，這用了什麼寫作手法？', 
+                    options: ['反諷', '自嘲與昇華', '寫實', '虛構'], 
+                    answer: 1, 
+                    explanation: '正確。這是一種高度的自我昇華。他沒有沉溺於「九死」的怨恨，反而將極致的苦難轉化為人生中獨一無二的「奇絕」體驗。',
+                    extraLearning: { title: '原文賞析：《六月二十日夜渡海》', content: '參橫斗轉欲三更，苦雨終風也解晴。\n雲散月明誰點綴？天容海色本澄清。\n空餘魯叟乘桴意，粗識軒轅奏樂聲。\n九死南荒吾不恨，茲遊奇絕冠平生。\n\n【歷史貢獻】\n貶謫海南島是僅次於滿門抄斬的極刑。但他沒有絕望，在當地辦學講課，傳授中原文化。在他的影響下，海南島出現了歷史上第一位舉人，當地人民至今仍無比敬仰這位東坡先生。' }
+                }
+            ]},
+            { id: 'special_event_2', name: '突發事件：海南餽贈', type: 'wheel', x: 48, y: 78, year: '1100年', desc: '蘇軾遇赦北歸，海南父老依依不捨，紛紛致贈當地名產。東坡感念道：「我本儋耳人，寄生西蜀州。」', poem: '我本儋耳人，寄生西蜀州。' },
+            { id: 'changzhou', name: '常州', x: 78, y: 24, year: '1101年 (66歲)', desc: '遇赦北歸，病逝於此。', poem: '問汝平生功業，黃州惠州儋州。', quizzes: [
+                { 
+                    question: '【思辨】蘇軾將黃州、惠州、儋州的流放生涯視為平生功業，這反映了苦難對其文學創作有何意義？', 
+                    options: ['阻礙了才華發揮', '累積了怨恨與憤世嫉俗', '淬鍊了靈魂，使作品更具厚度與生命力', '只是無奈的自我安慰'], 
+                    answer: 2, 
+                    explanation: '【思辨解析】蘇軾在最困頓的時期創作出最偉大的作品，這證明了苦難並非毀滅，而是靈魂的試金石，讓他的文學超越了政治得失，進入了永恆的生命境界。',
+                    extraLearning: { title: '原文賞析：《自題金山畫像》', content: '心似已灰之木，身如不繫之舟。\n問汝平生功業，黃州惠州儋州。\n\n【思辨延伸：苦難的禮物】\n如果一生順遂，他或許只是一位優秀的政治家，寫些歌功頌德的華麗文章。正是這三州接連不斷的打擊，逼迫他直視生命的本質，才造就了今天我們所敬仰的偉大文學家。' }
+                },
+                { 
+                    question: '【思辨】蘇軾最後總結一生：「也無風雨也無晴」。如果用一個現代詞彙來形容這種境界，你認為最貼切的是？', 
+                    options: ['躺平', '厭世', '和解', '奮鬥'], 
+                    answer: 2, 
+                    explanation: '【思辨解析】這是一種與自我、與世界、與命運的徹底「和解」。不再對抗風雨，也不再執著晴天，達到了內心真正的自由。',
+                    extraLearning: { title: '文學總結：也無風雨也無晴', content: '「也無風雨也無晴」出自他在黃州寫的《定風波》。\n\n到了他生命的最後時刻，這句話成為了他整個人生哲學的最佳寫照。政治上的得意（晴）與失意（風雨），在他眼中都已化為過眼雲煙，他以一顆平靜從容的心，走完了波瀾壯闊的一生。' }
+                }
+            ]}
+        ];
+
+        function QuizCard({ quiz, onAnswer, isActive, hasNext, onNext, isLastOfGame, onFinishGame, onShowExtra }) {
+            const [selected, setSelected] = useState(null);
+            const [showResult, setShowResult] = useState(false);
+
+            useEffect(() => {
+                setSelected(null);
+                setShowResult(false);
+            }, [quiz]);
+
+            if (!quiz || !isActive) return null;
+
+            const handleSelect = (index) => {
+                if (showResult) return;
+                setSelected(index);
+                setShowResult(true);
+                if (index === quiz.answer) {
+                    playSound('correct');
+                    onAnswer(true);
+                } else {
+                    playSound('wrong');
+                    onAnswer(false);
+                }
+            };
+
+            return (
+                <div className="absolute top-6 md:top-10 left-4 md:left-6 w-[18rem] md:w-[24rem] bg-[#fffdf5]/95 backdrop-blur-sm border-2 border-stone-400 rounded-lg shadow-xl overflow-hidden z-40 animate-pop-in font-serif flex flex-col max-h-[85%]">
+                    <div className="bg-amber-100 px-4 py-2 border-b border-stone-300 flex justify-between items-center shrink-0">
+                        <span className="font-bold text-stone-800 flex items-center gap-2 text-base md:text-lg">
+                            <span>🎓</span> 東坡小學堂
+                        </span>
+                        <span className="text-xs text-stone-500">詩詞賞析</span>
+                    </div>
+                    <div className="p-3 md:p-5 overflow-y-auto custom-scrollbar flex-1">
+                        <p className="text-stone-800 font-medium mb-4 text-sm md:text-base leading-relaxed text-justify">
+                            {quiz.question}
+                        </p>
+                        <div className="space-y-2">
+                            {quiz.options.map((option, idx) => {
+                                let btnClass = "w-full text-left px-3 py-2 text-sm md:text-base rounded border transition-colors ";
+                                if (!showResult) {
+                                    btnClass += "border-stone-300 hover:bg-amber-50 cursor-pointer text-stone-700";
+                                } else {
+                                    if (idx === quiz.answer) {
+                                        btnClass += "bg-green-100 border-green-500 text-green-800 font-bold shadow-sm";
+                                    } else if (idx === selected && idx !== quiz.answer) {
+                                        btnClass += "bg-red-100 border-red-500 text-red-800";
+                                    } else {
+                                        btnClass += "opacity-50 border-stone-200";
+                                    }
+                                }
+
+                                return (
+                                    <button 
+                                        key={idx}
+                                        onClick={() => handleSelect(idx)}
+                                        disabled={showResult}
+                                        className={btnClass}
+                                    >
+                                        {['A', 'B', 'C', 'D'][idx]}. {option}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        
+                        {/* 顯示答題結果區塊 */}
+                        {showResult && (
+                            <div className="mt-4 space-y-2">
+                                <div className={`p-3 rounded text-xs md:text-sm leading-relaxed border shadow-inner ${selected === quiz.answer ? 'bg-green-50 border-green-300 text-green-800' : 'bg-red-50 border-red-300 text-red-800'}`}>
+                                    <strong className="block mb-1 text-sm md:text-base">{selected === quiz.answer ? '🎉 答對了！' : '💡 答案是：' + ['A','B','C','D'][quiz.answer]}</strong>
+                                    {quiz.explanation}
+                                </div>
+                                
+                                {/* 多學一點按鈕 */}
+                                {quiz.extraLearning && selected === quiz.answer && (
+                                    <button 
+                                        onClick={() => onShowExtra(quiz.extraLearning)}
+                                        className="w-full py-2.5 bg-indigo-600 text-indigo-50 rounded font-bold hover:bg-indigo-700 hover:shadow-lg transition-all shadow flex items-center justify-center gap-2 mt-3 text-sm md:text-base border border-indigo-800"
+                                    >
+                                        💡 多學一點
+                                    </button>
+                                )}
+
+                                {hasNext && (
+                                    <button 
+                                        onClick={onNext}
+                                        className="w-full py-2 bg-amber-600 text-white rounded font-bold hover:shadow-lg transition-all shadow flex items-center justify-center gap-1 mt-2 text-sm md:text-base"
+                                    >
+                                        下一題 ➜
+                                    </button>
+                                )}
+
+                                {isLastOfGame && (
+                                    <button 
+                                        onClick={onFinishGame}
+                                        className="w-full py-2 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded font-bold hover:shadow-lg transition-all shadow flex items-center justify-center gap-1 mt-2 text-sm md:text-base"
+                                    >
+                                        ✨ 查看最終評價 ✨
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [introState, setIntroState] = useState('waiting');
+            const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+            const bgmRef = useRef(null);
+            const videoRef = useRef(null);
+
+            const [bgImage, setBgImage] = useState('貶謫路線2.png');
+            const [imageError, setImageError] = useState(false);
+            const [step, setStep] = useState(0); 
+            const [quizIndex, setQuizIndex] = useState(0);
+            const [score, setScore] = useState(3);
+            const [showFinalResult, setShowFinalResult] = useState(false);
+            
+            const [isQuizAnswered, setIsQuizAnswered] = useState(false);
+            const [isWheelDone, setIsWheelDone] = useState(false);
+            
+            // 控制「多學一點」知識補充視窗的狀態
+            const [extraModal, setExtraModal] = useState(null);
+
+            const fileInputRef = useRef(null);
+
+            const startIntro = () => {
+                if (videoRef.current) {
+                    videoRef.current.play().catch(e => console.log("Video play blocked:", e));
+                }
+                if (bgmRef.current) {
+                    bgmRef.current.play().catch(e => console.log("Audio play blocked:", e));
+                }
+                setIntroState('playing');
+                // 如果视频加载失败，5秒后自动进入
+                setTimeout(() => {
+                    if (introState === 'playing') {
+                        endIntro();
+                    }
+                }, 5000);
+            };
+
+            const endIntro = () => {
+                setIntroState('finished');
+                setShowWelcomeModal(true);
+            };
+
+            const handleImageUpload = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        setBgImage(e.target.result);
+                        setImageError(false);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const nextStep = () => {
+                if (step < LOCATIONS.length - 1) {
+                    setStep(step + 1);
+                    setQuizIndex(0);
+                    setIsQuizAnswered(false);
+                    setIsWheelDone(false);
+                }
+            };
+
+            const prevStep = () => {
+                if (step > 1) {
+                    setStep(step - 1);
+                    setQuizIndex(0);
+                    setIsQuizAnswered(false);
+                    setIsWheelDone(false);
+                }
+            };
+
+            const resetGame = () => {
+                setStep(0);
+                setQuizIndex(0);
+                setScore(3);
+                setShowFinalResult(false);
+                setIntroState('waiting');
+                setShowWelcomeModal(false);
+                setIsQuizAnswered(false);
+                setIsWheelDone(false);
+                setExtraModal(null);
+                
+                if (bgmRef.current) {
+                    bgmRef.current.pause();
+                    bgmRef.current.currentTime = 0;
+                }
+                if (videoRef.current) {
+                    videoRef.current.pause();
+                    videoRef.current.currentTime = 0;
+                }
+            };
 
             const startGame = () => {
-                // 播放背景音樂 (如果尚未播放)
-                if (bgmRef.current && bgmRef.current.paused) {
-                    bgmRef.current.play().catch(error => {
-                        console.log("Audio play failed, user interaction needed first.", error);
-                    });
-                }
-                // 從第一關開始，並初始化
-                loadLevel(0);
+                setStep(1);
+                setQuizIndex(0);
+                setScore(3);
+                setShowFinalResult(false);
+                setIsQuizAnswered(false);
+                setIsWheelDone(false);
             };
 
-            const stopGame = () => {
-                // 回到封面，不停止音樂，重置進度
-                if (bgmRef.current) {
-                    // 音樂重頭開始或繼續播放視需求而定，這裡重置時間讓封面更有感覺
-                    bgmRef.current.currentTime = 0;
-                    if(bgmRef.current.paused) {
-                         bgmRef.current.play().catch(e => console.error(e));
-                    }
-                }
-                setLevel(0);
-                setGameState('intro');
-            }
-
-            const loadLevel = (lvlIndex) => {
-                if (lvlIndex >= LEVELS.length) {
-                    setGameState('end');
-                    return;
-                }
-                
-                const levelData = LEVELS[lvlIndex];
-                
-                const pieces = [0, 1, 2, 3].map(pos => ({
-                    id: `p-${lvlIndex}-${pos}`,
-                    correctPos: pos,
-                    customImg: levelData.pieceImages ? levelData.pieceImages[pos] : null,
-                    bgPos: getBgPos(pos)
-                }));
-
-                let shuffled = [...pieces];
-                let attempts = 0;
-                do {
-                    shuffled.sort(() => Math.random() - 0.5);
-                    attempts++;
-                } while (JSON.stringify(shuffled) === JSON.stringify(pieces) && attempts < 10);
-
-                setPool(shuffled);
-                setGrid([null, null, null, null]);
-                setSelectedPiece(null);
-                setFoundMistakes([]);
-                setGameState('playing');
+            const nextQuiz = () => {
+                setQuizIndex(prev => prev + 1);
+                setIsQuizAnswered(false);
             };
 
-            const getBgPos = (index) => {
-                const x = (index % 2) * 100;
-                const y = Math.floor(index / 2) * 100;
-                return `${x}% ${y}%`;
-            };
-
-            // 修改標籤為「第X句」
-            const getSlotLabel = (index) => {
-                switch(index) {
-                    case 0: return "第一句";
-                    case 1: return "第二句";
-                    case 2: return "第三句";
-                    case 3: return "第四句";
-                    default: return "";
-                }
-            };
-
-            const handlePoolClick = (piece) => {
-                if (gameState !== 'playing') return;
-                
-                if (selectedPiece && selectedPiece.id === piece.id) {
-                    setSelectedPiece(null);
-                } else {
-                    setSelectedPiece(piece);
-                }
-            };
-
-            const handleGridClick = (index) => {
-                if (gameState !== 'playing') return;
-
-                const currentPieceInSlot = grid[index];
-
-                if (selectedPiece) {
-                    const newGrid = [...grid];
-                    const newPool = pool.filter(p => p.id !== selectedPiece.id);
-
-                    if (currentPieceInSlot) {
-                        newPool.push(currentPieceInSlot);
-                    }
-
-                    newGrid[index] = selectedPiece;
-
-                    setGrid(newGrid);
-                    setPool(newPool);
-                    setSelectedPiece(null);
-
-                    checkWin(newGrid);
-                } 
-                else if (currentPieceInSlot) {
-                    const newGrid = [...grid];
-                    newGrid[index] = null;
-                    const newPool = [...pool, currentPieceInSlot];
-                    setGrid(newGrid);
-                    setPool(newPool);
-                }
-            };
-
-            const checkWin = (currentGrid) => {
-                const isFull = currentGrid.every(p => p !== null);
-                if (!isFull) return;
-
-                const isCorrect = currentGrid.every((p, index) => p.correctPos === index);
-                
+            const handleAnswer = (isCorrect) => {
                 if (isCorrect) {
-                    // 如果這關有設定找碴，進入找碴模式
-                    if (LEVELS[level].mistakes && LEVELS[level].mistakes.length > 0) {
-                        setGameState('spotting');
-                    } else {
-                        // 否則直接勝利
-                        setGameState('won');
-                    }
+                    setScore(prev => Math.min(prev + 1, 20)); 
                 }
+                setIsQuizAnswered(true); 
+            };
+            
+            const handleWheelComplete = (points) => {
+                setScore(prev => Math.max(0, Math.min(prev + points, 20)));
+                setIsWheelDone(true); 
             };
 
-            // 處理找碴點擊
-            const handleSpottingClick = (e) => {
-                if (gameState !== 'spotting') return;
-                
-                const currentLevelData = LEVELS[level];
-                if (!currentLevelData.mistakes) return;
-
-                const rect = e.target.getBoundingClientRect();
-                
-                // 計算點擊位置 (px)
-                const clickX = e.clientX - rect.left;
-                const clickY = e.clientY - rect.top;
-
-                // 檢查是否點到錯誤區塊
-                let hit = false;
-                currentLevelData.mistakes.forEach(mistake => {
-                    // 已經找過的就不算了
-                    if (foundMistakes.includes(mistake.id)) return;
-
-                    // 將錯誤位置從百分比轉換為像素
-                    const targetX = (mistake.x / 100) * rect.width;
-                    const targetY = (mistake.y / 100) * rect.height;
-
-                    // 計算像素距離
-                    const dist = Math.sqrt(Math.pow(clickX - targetX, 2) + Math.pow(clickY - targetY, 2));
-                    
-                    // 視覺上的寬度是 (r*4) px，所以半徑是 (r*2) px
-                    // 我們使用這個像素半徑來進行嚴格判定
-                    const radiusPx = (mistake.r || 10) * 2;
-
-                    if (dist <= radiusPx) {
-                        playDingSound();
-                        const newFound = [...foundMistakes, mistake.id];
-                        setFoundMistakes(newFound);
-                        hit = true;
-
-                        // 檢查是否找完所有錯誤
-                        if (newFound.length === currentLevelData.mistakes.length) {
-                            setTimeout(() => {
-                                setGameState('won');
-                            }, 1000); // 延遲一下讓玩家看到最後一個圈圈
-                        }
-                    }
-                });
+            const handleRPSWin = () => {
+                setScore(prev => Math.min(prev + 1, 20));
+                nextStep();
             };
 
-            const nextLevel = () => {
-                setLevel(level + 1);
+            const handleRPSLose = () => {
+                setStep(0); 
+                setQuizIndex(0);
+                setScore(3);
+                setIsQuizAnswered(false);
+                setIsWheelDone(false);
             };
 
-            const resetLevel = () => {
-                loadLevel(level);
+            const handleFinishGame = () => {
+                setShowFinalResult(true);
+                playSound('win');
             };
 
-            const currentLevelData = LEVELS[level] || LEVELS[0];
-
-            const renderPiece = (piece, isSelected = false) => {
-                const style = piece.customImg 
-                    ? {
-                        backgroundImage: `url(${piece.customImg})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat'
-                      }
-                    : {
-                        backgroundImage: `url(${currentLevelData.imageUrl})`,
-                        backgroundSize: '200% 200%',
-                        backgroundPosition: piece.bgPos,
-                        backgroundRepeat: 'no-repeat'
-                      };
-
-                return (
-                    <div 
-                        className={`w-full aspect-video rounded-md shadow-sm border-2 transition-all duration-300 relative overflow-hidden bg-stone-200
-                            ${isSelected ? 'border-yellow-600 ring-2 ring-yellow-400 scale-105 z-10' : 'border-stone-300 hover:border-stone-400'}
-                        `}
-                        style={style}
-                    >
-                    </div>
-                );
+            const getFriendshipLevel = (score) => {
+                if (score >= 20) return { level: "生死之交", poem: "竹杖芒鞋輕勝馬，誰怕？一蓑煙雨任平生。" };
+                if (score >= 17) return { level: "莫逆之交", poem: "人生到處知何似，應似飛鴻踏雪泥。" };
+                if (score >= 14) return { level: "金蘭之交", poem: "試問嶺南應不好，卻道：此心安處是吾鄉。" };
+                if (score >= 10) return { level: "推心置腹", poem: "九死南荒吾不恨，茲遊奇絕冠平生。" };
+                if (score >= 6) return { level: "泛泛之交", poem: "長恨此身非我有，何時忘卻營營。" };
+                return { level: "一面之交", poem: "人有悲歡離合，月有陰晴圓缺，此事古難全。" };
             };
 
-            // -------------------------------------------------------------------------
-            // 頁面渲染
-            // -------------------------------------------------------------------------
+            const currentLocation = LOCATIONS[step];
+            const currentQuiz = currentLocation.quizzes ? currentLocation.quizzes[quizIndex] : null;
+            const hasNextQuiz = currentLocation.quizzes && quizIndex < currentLocation.quizzes.length - 1;
+            const isLastOfGame = step === LOCATIONS.length - 1 && currentQuiz && (!hasNextQuiz);
+            const friendship = getFriendshipLevel(score);
 
-            // 0. 開頭影片 (Video Intro)
-            if (gameState === 'video_intro') {
-                return (
-                    <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-                        <video 
-                            src="eyemovie.mp4" 
-                            className="w-full h-full object-contain" 
-                            autoPlay 
-                            controls
-                            onEnded={() => setGameState('intro')}
-                        >
-                            您的瀏覽器不支援影片標籤。
-                        </video>
-                        <button 
-                            onClick={() => setGameState('intro')}
-                            className="absolute top-5 right-5 text-white/80 border border-white/30 hover:border-white px-4 py-2 rounded-full hover:bg-white/10 transition-all z-50 text-sm tracking-widest"
-                        >
-                            跳過影片
-                        </button>
-                    </div>
-                );
+            let canNext = true;
+            if (step > 0) {
+                if (currentLocation.type === 'rps') {
+                    canNext = false; 
+                } else if (currentLocation.type === 'wheel') {
+                    canNext = isWheelDone; 
+                } else if (currentQuiz) {
+                    canNext = isQuizAnswered && !hasNextQuiz; 
+                }
             }
 
-            // 1. 封面 (Intro) - 滿版設計
-            if (gameState === 'intro') {
-                return (
-                    <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-stone-100 font-serif relative overflow-hidden">
-                        
-                        {/* 滿版封面背景圖 */}
-                        <div className="absolute inset-0 z-0">
-                            <img 
-                                src="詩眼天涯.png" 
-                                alt="詩眼天涯封面" 
-                                className="w-full h-full object-cover opacity-100"
-                                onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = "https://placehold.co/1920x1080/3f3f46/a1a1aa?text=詩眼天涯"; // 備用圖
-                                }}
-                            />
-                            {/* 遮罩層增加文字可讀性 */}
-                            <div className="absolute inset-0 bg-black/40"></div>
-                        </div>
-
-                        <div className="relative z-10 max-w-2xl w-full text-center space-y-12 animate-fade-in">
-                            
-                            <h1 className="text-6xl font-bold text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] tracking-[0.5em] mb-4">
-                                詩眼天涯
-                            </h1>
-
-                            {/* 開始按鈕 */}
-                            <div>
-                                <button 
-                                    onClick={startGame}
-                                    className="bg-stone-100/90 text-stone-900 px-16 py-5 rounded-full text-2xl hover:bg-white hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center gap-3 mx-auto tracking-widest font-bold backdrop-blur-sm"
-                                >
-                                    <Icons.Play size={32} fill="currentColor" /> 遊戲開始
-                                </button>
-                            </div>
-
-                            {/* 說明文字 */}
-                            <div className="bg-black/60 p-6 rounded-lg border border-white/20 backdrop-blur-md max-w-lg mx-auto text-stone-100 shadow-xl">
-                                <p className="text-lg font-bold mb-2 flex items-center justify-center gap-2 text-yellow-400">
-                                    <Icons.Info size={20} /> 遊戲說明
-                                </p>
-                                <p className="leading-relaxed tracking-wide">
-                                    請將詩句圖片正確排列後，接下來完整構圖找出錯誤的地方。
-                                </p>
-                                <p className="mt-4 pt-4 border-t border-white/30 text-sm text-stone-300 font-bold tracking-widest text-center">
-                                    林威宇老師X南一書局製作
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                );
+            let btnText = '下一站';
+            if (step === 0) {
+                btnText = '開始行旅';
+            } else if (!canNext) {
+                if (currentLocation.type === 'wheel') btnText = '請先抽獎';
+                else if (currentQuiz) {
+                    btnText = isQuizAnswered ? '請按下一題' : '請先答題';
+                }
             }
 
-            // 2. 結束畫面 (End)
-            if (gameState === 'end') {
-                return (
-                    <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-stone-100 font-serif relative overflow-hidden">
-                         
-                        {/* 背景圖：與封面一致 */}
-                        <div className="absolute inset-0 z-0">
-                            <img 
-                                src="詩眼天涯.png" 
-                                alt="詩眼天涯封面" 
-                                className="w-full h-full object-cover opacity-100"
-                                onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = "https://placehold.co/1920x1080/3f3f46/a1a1aa?text=詩眼天涯"; // 備用圖
-                                }}
-                            />
-                            <div className="absolute inset-0 bg-black/40"></div>
-                        </div>
-
-                        <div className="relative z-10 max-w-md w-full text-center space-y-8 animate-fade-in">
-                            <h1 className="text-5xl font-bold text-white mb-4 tracking-widest drop-shadow-md">詩眼天涯</h1>
-                            <div className="bg-black/60 p-8 rounded-lg shadow-xl border border-white/20 backdrop-blur-md text-stone-100">
-                                <div className="mx-auto mb-4 text-yellow-400 flex justify-center">
-                                    <Icons.Award size={64} />
-                                </div>
-                                <p className="text-xl mb-6 font-bold">恭喜您！已完成所有畫卷修復。</p>
-                                <p className="text-stone-300 mb-8">詩情畫意，盡在眼中。</p>
-                                <button 
-                                    onClick={stopGame}
-                                    className="bg-white/90 text-stone-900 px-8 py-3 rounded-full text-lg hover:bg-white transition-colors flex items-center justify-center gap-2 mx-auto font-bold"
-                                >
-                                    <Icons.RotateCcw size={20} /> 重頭再來
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-
-            // 3. 遊戲主畫面 (Playing / Spotting / Won)
             return (
-                <div className="min-h-screen text-stone-800 font-serif flex flex-col relative overflow-hidden">
-                    {/* 背景裝飾 */}
-                    <div className="absolute top-0 right-0 w-64 h-64 opacity-5 pointer-events-none select-none">
-                        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                            <path fill="#292524" d="M45.7,-76.3C58.9,-69.3,69.1,-55.6,76.5,-41.2C83.9,-26.8,88.5,-11.7,85.8,2.2C83.1,16.1,73.1,28.8,63.4,40.4C53.7,52,44.3,62.5,32.8,68.9C21.3,75.3,7.7,77.6,-5.3,86.1C-18.3,94.6,-30.7,109.3,-41.2,107.5C-51.7,105.7,-60.3,87.4,-67.6,71.7C-74.9,56,-80.9,42.9,-83.4,29.3C-85.9,15.7,-84.9,1.6,-80.7,-10.8C-76.5,-23.2,-69.1,-33.9,-59.7,-42.6C-50.3,-51.3,-38.9,-58,-27.4,-66.2C-15.9,-74.4,-4.3,-84.1,8.2,-87.3C20.7,-90.5,41.4,-87.2,45.7,-76.3Z" transform="translate(100 100)" />
-                        </svg>
-                    </div>
+                <div className="flex flex-col items-center min-h-screen py-2 px-2 md:py-4 md:px-6 bg-[#f0ebe5]">
+                    
+                    <audio ref={bgmRef} src="背景音樂.mp3" loop onError={() => console.log("背景音樂加載失敗")} />
 
-                    {/* 頂部導航 */}
-                    <header className="p-4 flex justify-between items-center border-b border-stone-300 bg-white/50 backdrop-blur-sm z-10 shadow-sm">
-                        <div className="flex items-center gap-2">
-                            <Icons.Image className="text-stone-700" size={24} />
-                            <h1 className="text-xl font-bold tracking-widest text-stone-900">詩眼天涯</h1>
-                        </div>
-                        <div className="text-stone-500 text-sm font-sans flex items-center gap-1">
-                            <span>第 {level + 1} / {LEVELS.length} 關</span>
-                        </div>
-                    </header>
-
-                    {/* 修改 max-w-lg 為 max-w-4xl 以放大整體區域 */}
-                    <main className="flex-1 flex flex-col items-center p-4 max-w-4xl mx-auto w-full z-10 gap-6">
-                        
-                        {/* 標題區 */}
-                        <div className="text-center w-full">
-                            <h2 className="text-2xl font-bold text-stone-800 mb-1">{currentLevelData.title}</h2>
-                            <p className="text-xl text-stone-600 font-bold font-sans">
-                                {gameState === 'spotting' ? `拼圖完成！請在圖中找出 ${currentLevelData.mistakes.length} 個錯誤之處` : "請將下方破碎唐詩畫面依序置入對應位置以修復詩作"}
-                            </p>
-                        </div>
-
-                        {/* 遊戲核心區域 */}
-                        <div className="w-full relative shadow-2xl rounded-lg overflow-hidden border-4 border-white bg-stone-100">
+                    {introState !== 'finished' && (
+                        <div className="fixed inset-0 z-[100] bg-gradient-to-b from-slate-900 via-red-900 to-amber-900 flex flex-col items-center justify-center">
+                            <video 
+                                ref={videoRef}
+                                src="東坡開場.mp4" 
+                                playsInline
+                                muted 
+                                onEnded={endIntro}
+                                onError={() => setTimeout(endIntro, 3000)}
+                                className="w-full h-full object-contain absolute inset-0"
+                            />
                             
-                            {/* 狀態：WON (全關卡完成顯示，或找碴後的過場) */}
-                            {gameState === 'won' ? (
-                                <div className="w-full aspect-video relative animate-fade-in">
-                                    <img 
-                                        /* 這裡進行判斷：如果有 correctImageUrl 則顯示正確圖，否則顯示原圖 */
-                                        src={currentLevelData.correctImageUrl || currentLevelData.imageUrl} 
-                                        alt="Complete" 
-                                        className="w-full h-full object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-black/10"></div>
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
-                                        <Seal text="絕妙" />
-                                    </div>
-                                    
-                                    {/* 下一關按鈕覆蓋層 */}
-                                    <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                                         <button 
-                                            onClick={nextLevel}
-                                            className="bg-stone-900/90 text-white px-6 py-2 rounded-full hover:bg-black transition-all flex items-center gap-2 shadow-lg backdrop-blur-sm"
-                                        >
-                                            下一關 <Icons.ArrowRight size={18} />
-                                        </button>
-                                    </div>
-                                    
-                                    {/* 詩詞賞析覆蓋層 */}
-                                    <div className="absolute top-4 left-4 right-4 bg-white/80 backdrop-blur-md p-3 rounded text-center text-sm font-bold text-stone-800 border border-stone-200">
-                                        {currentLevelData.desc}
-                                    </div>
-                                </div>
-                            ) : gameState === 'spotting' ? (
-                                /* 狀態：SPOTTING (大家來找碴) */
-                                <div className="w-full aspect-video relative animate-fade-in cursor-crosshair group">
-                                    <img 
-                                        src={currentLevelData.imageUrl} 
-                                        alt="Spot Difference" 
-                                        className="w-full h-full object-cover"
-                                        onClick={handleSpottingClick}
-                                    />
-                                    
-                                    {/* 這裡移除了原本的測試/提示框 (yellow dashed)，
-                                        現在玩家在點擊前看不到任何提示區域。
-                                    */}
-
-                                    {/* 顯示已找到的錯誤（紅色實線框）與說明文字 */}
-                                    {foundMistakes.map(id => {
-                                        const mistake = currentLevelData.mistakes.find(m => m.id === id);
-                                        return (
-                                            <React.Fragment key={id}>
-                                                <div 
-                                                    className="absolute border-4 border-red-500 rounded-full animate-pulse-ring box-border"
-                                                    style={{
-                                                        left: `${mistake.x}%`,
-                                                        top: `${mistake.y}%`,
-                                                        width: `${(mistake.r || 10) * 4}px`, // 動態大小
-                                                        height: `${(mistake.r || 10) * 4}px`,
-                                                        transform: 'translate(-50%, -50%)',
-                                                        pointerEvents: 'none' // 讓點擊能穿透
-                                                    }}
-                                                />
-                                                {/* 說明文字框 */}
-                                                <div 
-                                                    className="absolute text-white bg-black/80 px-4 py-3 rounded-lg text-base font-bold border border-white/30 shadow-lg whitespace-nowrap z-50 animate-fade-in pointer-events-none"
-                                                    style={{
-                                                        left: `${mistake.x}%`,
-                                                        top: `${mistake.y}%`,
-                                                        transform: 'translate(-50%, -150%)' // 往上偏移顯示
-                                                    }}
-                                                >
-                                                    {mistake.explanation}
-                                                    {/* 小箭頭裝飾 */}
-                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/80"></div>
-                                                </div>
-                                            </React.Fragment>
-                                        );
-                                    })}
-                                    
-                                    <div className="absolute top-2 right-2 bg-stone-900/80 text-white px-3 py-1 rounded-full text-xs font-sans backdrop-blur-sm border border-white/20">
-                                        已找到: {foundMistakes.length} / {currentLevelData.mistakes.length}
-                                    </div>
-                                </div>
-                            ) : (
-                                /* 狀態：PLAYING (拼圖進行中) */
-                                <div className="grid grid-cols-2 gap-0.5 bg-stone-300 border border-stone-300">
-                                    {grid.map((piece, index) => (
-                                        <div 
-                                            key={`slot-${index}`}
-                                            onClick={() => handleGridClick(index)}
-                                            className={`aspect-video bg-stone-100 relative flex items-center justify-center cursor-pointer overflow-hidden transition-colors
-                                                ${!piece && selectedPiece ? 'hover:bg-yellow-50/50' : ''}
-                                            `}
-                                        >
-                                            {piece ? (
-                                                renderPiece(piece, false)
-                                            ) : (
-                                                <span className="text-stone-300 font-bold text-lg select-none tracking-widest">
-                                                    {getSlotLabel(index)}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
+                            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/40 via-transparent to-red-900/40 flex flex-col items-start justify-start z-10 p-6 md:p-12">
+                                <h1 className="text-4xl md:text-6xl font-calligraphy text-amber-100 drop-shadow-2xl mb-2 text-left">東坡行旅</h1>
+                                <p className="text-lg md:text-xl text-amber-50/90 font-serif drop-shadow-lg text-left">一蓑煙雨任平生</p>
+                            </div>
+                            
+                            {introState === 'waiting' && (
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-[102] backdrop-blur-sm">
+                                    <button 
+                                        onClick={startIntro}
+                                        className="bg-red-800 hover:bg-red-700 text-amber-50 px-8 py-4 rounded-full font-serif font-bold text-3xl shadow-[0_0_30px_rgba(153,27,27,0.6)] transition-all transform hover:scale-110 border-2 border-red-500"
+                                    >
+                                        開始體驗
+                                    </button>
                                 </div>
                             )}
-                        </div>
 
-                        {/* 控制按鈕 (僅在拼圖進行中顯示) */}
-                        {gameState === 'playing' && (
-                            <div className="flex justify-end w-full">
+                            {introState === 'playing' && (
                                 <button 
-                                    onClick={resetLevel}
-                                    className="text-stone-500 hover:text-stone-800 text-sm flex items-center gap-1 transition-colors"
+                                    onClick={endIntro}
+                                    className="absolute bottom-10 right-10 bg-stone-800/80 hover:bg-stone-700 text-white px-6 py-2 rounded-full font-serif border border-stone-500 transition-colors z-[101] shadow-lg text-lg"
                                 >
-                                    <Icons.RotateCcw size={14} /> 重置本關
+                                    略過 ⏭
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 知識補充 Modal */}
+                    {extraModal && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                            <div className="bg-[#fcfaf5] p-6 md:p-8 rounded-xl shadow-2xl border-4 border-indigo-900 animate-pop-in text-center max-w-lg w-[90%] relative max-h-[90vh] overflow-y-auto custom-scrollbar">
+                                <h3 className="text-2xl md:text-3xl font-bold text-indigo-900 mb-4 font-calligraphy border-b-2 border-indigo-200 pb-2">
+                                    {extraModal.title}
+                                </h3>
+                                <div className="text-stone-700 font-serif leading-relaxed text-left mb-6 text-sm md:text-base whitespace-pre-line bg-stone-100 p-4 rounded border border-stone-200 shadow-inner">
+                                    {extraModal.content}
+                                </div>
+                                <button 
+                                    onClick={() => setExtraModal(null)}
+                                    className="w-full bg-indigo-700 text-white font-bold py-3 rounded-lg hover:bg-indigo-800 transition-colors shadow-md border border-indigo-900"
+                                >
+                                    閱讀完畢，繼續遊戲
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 最終結算視窗 - 已移除黑色半透明變暗背景，改為透明的毛玻璃效果 */}
+                    {showFinalResult && (
+                        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-transparent backdrop-blur-sm">
+                            <Fireworks />
+                            <div className="bg-[#fffdf5] p-8 rounded-xl shadow-2xl border-4 border-amber-500 animate-pop-in text-center w-[20rem] md:w-[28rem] max-h-[95vh] overflow-y-auto custom-scrollbar relative z-10">
+                                <h2 className="text-2xl md:text-3xl font-bold text-stone-800 mb-4 font-calligraphy">旅程圓滿結束</h2>
+                                <div className="text-5xl my-4">🎉</div>
+                                <p className="text-stone-600 mb-3 text-base md:text-lg">您與東坡先生的文采共鳴度：</p>
+                                <div className="text-4xl md:text-5xl font-bold text-red-600 mb-3 font-calligraphy drop-shadow-md">
+                                    {friendship.level}
+                                </div>
+                                <p className="text-stone-500 text-sm md:text-base mb-5">最終文采值：{score}</p>
+                                
+                                <div className="bg-stone-100 p-3 rounded mb-6 border border-stone-200">
+                                    <p className="font-calligraphy text-stone-700 text-xl md:text-2xl">「{friendship.poem}」</p>
+                                </div>
+
+                                <button 
+                                    onClick={resetGame}
+                                    className="bg-stone-800 text-amber-50 px-6 py-3 rounded-full font-bold hover:bg-stone-700 transition-colors shadow-lg w-full text-lg border-2 border-amber-500/30"
+                                >
+                                    重新遊歷
+                                </button>
+                                
+                                <div className="mt-4 text-center text-stone-400 font-calligraphy text-sm drop-shadow-sm">
+                                    南一書局 X 林威宇老師製作
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {showWelcomeModal && (
+                        <div className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center backdrop-blur-sm">
+                            <div className="bg-[#fffdf5] p-8 rounded-xl shadow-2xl border-4 border-stone-400 max-w-md w-[90%] text-center animate-pop-in">
+                                <div className="text-4xl mb-4">📜</div>
+                                <p className="text-stone-800 font-serif leading-relaxed text-lg mb-6">
+                                    跟著蘇東坡遊歷大江南北，感受其生命體察後所創作的文學作品。
+                                </p>
+                                <button
+                                    onClick={() => setShowWelcomeModal(false)}
+                                    className="bg-red-800 text-white px-8 py-2 text-base rounded-full font-bold font-serif shadow-lg hover:bg-red-900 transition-colors border border-red-600"
+                                >
+                                    開始遊歷
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step > 0 && (
+                        <div className="w-[95vw] max-w-[1280px] mb-4 grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up mx-auto z-10">
+                            <div className={`md:col-span-1 bg-white p-4 md:p-5 rounded-lg shadow-md border-l-4 ${currentLocation.type === 'special' || currentLocation.type === 'wheel' || currentLocation.type === 'rps' ? 'border-purple-600' : 'border-red-800'} relative overflow-hidden`}>
+                                <div className="absolute top-0 right-0 -mt-2 -mr-2 text-7xl md:text-8xl text-stone-100 font-calligraphy select-none z-0">
+                                    {currentLocation.name[0]}
+                                </div>
+                                <div className="relative z-10">
+                                    <div className="flex items-baseline gap-2 mb-2">
+                                        <h2 className="text-2xl md:text-3xl font-bold text-stone-800 font-calligraphy">{currentLocation.name}</h2>
+                                        <span className={`text-xs md:text-sm font-bold ${currentLocation.type === 'special' || currentLocation.type === 'wheel' || currentLocation.type === 'rps' ? 'text-purple-700 bg-purple-50' : 'text-red-700 bg-red-50'} px-2 py-0.5 rounded-full`}>{currentLocation.year}</span>
+                                    </div>
+                                    <p className="text-stone-700 text-sm md:text-base leading-relaxed text-justify">
+                                        {currentLocation.desc}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="md:col-span-2 bg-stone-800 text-stone-200 p-5 md:p-6 rounded-lg shadow-md relative overflow-hidden">
+                                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/black-paper.png')]"></div>
+                                <div className="relative z-10 flex flex-col h-full justify-center items-center text-center">
+                                    <div className="mb-2 text-amber-500 text-xs md:text-sm tracking-[0.2em] uppercase border-b border-amber-500/30 pb-1">
+                                        {currentLocation.type === 'special' || currentLocation.type === 'wheel' || currentLocation.type === 'rps' ? '軼聞趣事' : '東坡詩詞選'}
+                                    </div>
+                                    <blockquote className="text-xl md:text-2xl font-calligraphy leading-loose text-white drop-shadow-md px-4">
+                                        「{currentLocation.poem}」
+                                    </blockquote>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="relative w-[95vw] max-w-[1280px] bg-stone-200 rounded-xl shadow-2xl overflow-hidden border-4 border-stone-300 flex flex-col aspect-video mx-auto">
+                        
+                        {bgImage && !imageError ? (
+                            <div className="relative w-full h-full">
+                                <img 
+                                    src={bgImage} 
+                                    alt="地圖背景" 
+                                    className="w-full h-full object-contain pointer-events-none select-none bg-[#e8e0d5]" 
+                                    onError={() => setImageError(true)} 
+                                />
+                                
+                                {step > 0 && (
+                                    <>
+                                        <div 
+                                            className="absolute w-16 h-16 md:w-28 md:h-28 transition-all duration-1000 ease-in-out z-20 transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:scale-110 drop-shadow-2xl flex items-center justify-center"
+                                            style={{ left: `${currentLocation.x}%`, top: `${currentLocation.y}%` }}
+                                        >
+                                            <img 
+                                                src="東坡小圖.png" 
+                                                alt="東坡" 
+                                                className="w-full h-full object-contain filter drop-shadow-md" 
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    // 显示备用文字
+                                                    e.target.parentElement.innerHTML = '<div class="text-3xl md:text-5xl">📜</div>';
+                                                }}
+                                            />
+                                            <div className="absolute -bottom-6 md:-bottom-8 left-1/2 transform -translate-x-1/2 bg-white/90 px-2 py-0.5 md:py-1 rounded text-xs md:text-sm font-bold whitespace-nowrap shadow-sm border border-stone-400 text-stone-800">
+                                                {currentLocation.name}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {LOCATIONS.map((loc, index) => {
+                                    if (index === 0) return null;
+                                    const isActive = index === step;
+                                    const isPast = index < step;
+                                    const isSpecial = loc.type === 'special';
+                                    const isWheel = loc.type === 'wheel';
+                                    const isRPS = loc.type === 'rps';
+                                    
+                                    let markerClass = "";
+                                    if (isActive) {
+                                        markerClass = (isSpecial || isWheel || isRPS ? 'bg-purple-600 ring-purple-200' : 'bg-red-600 ring-red-200') + ' scale-150 ring-4 z-10';
+                                    } else if (isPast) {
+                                        markerClass = 'bg-stone-600 z-0';
+                                    } else {
+                                        markerClass = (isSpecial || isWheel || isRPS ? 'bg-purple-400 border-purple-400' : 'bg-transparent border-stone-400') + ' border opacity-50';
+                                    }
+
+                                    return (
+                                        <div 
+                                            key={loc.id}
+                                            className={`absolute w-2.5 h-2.5 md:w-3 md:h-3 rounded-full transform -translate-x-1/2 -translate-y-1/2 transition-colors duration-500 ${markerClass}`}
+                                            style={{ left: `${loc.x}%`, top: `${loc.y}%` }}
+                                        />
+                                    );
+                                })}
+
+                                {step > 0 && currentQuiz && !currentLocation.type && (
+                                    <QuizCard 
+                                        key={currentLocation.id + quizIndex}
+                                        quiz={currentQuiz} 
+                                        isActive={!showFinalResult}
+                                        onAnswer={handleAnswer}
+                                        hasNext={hasNextQuiz} 
+                                        onNext={nextQuiz}
+                                        isLastOfGame={isLastOfGame} 
+                                        onFinishGame={handleFinishGame}
+                                        onShowExtra={setExtraModal}
+                                    />
+                                )}
+                                
+                                {step > 0 && currentLocation.type === 'special' && currentQuiz && (
+                                    <QuizCard 
+                                        key={currentLocation.id + quizIndex}
+                                        quiz={currentQuiz} 
+                                        isActive={true}
+                                        onAnswer={handleAnswer}
+                                        hasNext={hasNextQuiz}
+                                        onNext={nextQuiz}
+                                        onShowExtra={setExtraModal}
+                                    />
+                                )}
+                                
+                                {step > 0 && currentLocation.type === 'wheel' && (
+                                    <LuckyWheel 
+                                        key={currentLocation.id}
+                                        isActive={true}
+                                        onComplete={handleWheelComplete}
+                                    />
+                                )}
+
+                                {step > 0 && currentLocation.type === 'rps' && (
+                                    <RockPaperScissors
+                                        key={currentLocation.id}
+                                        isActive={true}
+                                        onWin={handleRPSWin}
+                                        onLose={handleRPSLose}
+                                    />
+                                )}
+
+                                <div className="absolute top-1/2 -translate-y-1/2 right-4 md:right-8 flex flex-col items-center gap-6 z-30 pointer-events-none">
+                                    <div className="pointer-events-auto">
+                                        {step > 0 && <ScoreBoard score={score} />}
+                                    </div>
+                                    <div className="flex flex-col gap-3 w-[100px] md:w-[130px] pointer-events-auto">
+                                        {step > 1 && currentLocation.type !== 'rps' && !showFinalResult && (
+                                            <button onClick={prevStep} className="w-full px-4 py-2 bg-white/90 backdrop-blur text-stone-700 rounded-lg shadow-md hover:bg-white border border-stone-300 font-serif text-sm md:text-base whitespace-nowrap">
+                                                上一站
+                                            </button>
+                                        )}
+                                        {step < LOCATIONS.length - 1 && currentLocation.type !== 'rps' && (
+                                            <button 
+                                                onClick={step === 0 ? startGame : nextStep} 
+                                                disabled={step > 0 && !canNext}
+                                                className={`w-full px-4 py-3 rounded-lg shadow-md font-bold tracking-widest font-serif ring-2 text-sm md:text-base whitespace-nowrap transition-all ${
+                                                    step > 0 && !canNext 
+                                                    ? 'bg-stone-300 text-stone-500 ring-stone-300 cursor-not-allowed opacity-90' 
+                                                    : 'bg-red-800 text-white hover:bg-red-900 ring-red-200'
+                                                }`}
+                                            >
+                                                {btnText}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full w-full bg-[url('https://www.transparenttextures.com/patterns/aged-paper.png')]">
+                                <div className="text-6xl mb-4 opacity-40">🗺️</div>
+                                <h3 className="text-2xl md:text-3xl font-bold text-stone-700 mb-4">歡迎蒞臨</h3>
+                                <p className="text-stone-600 mb-8 max-w-md text-center text-base leading-relaxed">上傳高清地圖圖片以獲得更佳體驗（可選）</p>
+                                <button 
+                                    onClick={() => fileInputRef.current.click()}
+                                    className="px-6 py-3 bg-stone-700 text-amber-50 rounded-lg shadow-lg hover:bg-stone-800 transition-colors font-bold flex items-center gap-2 text-lg"
+                                >
+                                    📤 上傳地圖圖片
                                 </button>
                             </div>
                         )}
-
-                        {/* 備選圖片區 (Pool) */}
-                        {gameState === 'playing' && (
-                            <div className="w-full space-y-2">
-                                <div className="text-stone-500 text-xs font-sans ml-1">吉光片羽：</div>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {pool.map((piece) => (
-                                        <div 
-                                            key={piece.id}
-                                            onClick={() => handlePoolClick(piece)}
-                                            className="cursor-pointer group relative flex flex-col items-center"
-                                        >
-                                            {renderPiece(piece, selectedPiece && selectedPiece.id === piece.id)}
-                                            
-                                            {/* 已移除詩句/檔名標籤 */}
-                                        </div>
-                                    ))}
-                                    {Array.from({ length: 4 - pool.length }).map((_, i) => (
-                                        <div key={`empty-${i}`} className="aspect-video bg-stone-200/50 rounded-md border-2 border-dashed border-stone-200"></div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                         
-                        {/* 找碴模式下的提示 */}
-                        {gameState === 'spotting' && (
-                             <div className="text-stone-500 text-sm animate-pulse">
-                                提示：點擊畫面中不合理的地方
-                            </div>
-                        )}
+                        <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                    </div>
 
-                    </main>
+                    <div className="text-center mt-6 mb-2 z-10">
+                        <h1 className="text-3xl md:text-5xl font-calligraphy text-stone-800 mb-1 drop-shadow-sm">東坡行旅</h1>
+                        <p className="text-stone-600 font-serif text-sm md:text-base">一蓑煙雨任平生：蘇軾貶謫路線互動圖</p>
+                    </div>
+                    
+                    <footer className="w-full text-center py-4 text-stone-500 font-serif text-sm md:text-base mt-auto z-10">
+                        南一書局 X 林威宇老師製作
+                    </footer>
                 </div>
             );
         }
