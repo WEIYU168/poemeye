@@ -138,14 +138,14 @@
             {
                 id: 1,
                 title: "第一關：登鸛雀樓詩句排列",
-                imageUrl: "登鸛雀樓.png", 
-                correctImageUrl: "登鸛雀樓正確圖.png",
+                imageUrl: "登鸛雀樓.jpg",
+                correctImageUrl: "登鸛雀樓正確圖.jpg",
                 desc: "白日依山盡，黃河入海流。\n欲窮千里目，更上一層樓。——王之渙《登鸛雀樓》",
                 pieceImages: [
-                    "白日依山盡.png", 
-                    "黃河入海流.png", 
-                    "欲窮千里目.png", 
-                    "更上一層樓.png" 
+                    "白日依山盡.jpg",
+                    "黃河入海流.jpg",
+                    "欲窮千里目.jpg",
+                    "更上一層樓.jpg"
                 ],
                 // 大家來找碴配置 (1個大小 = 5%)
                 mistakes: [
@@ -160,14 +160,14 @@
             {
                 id: 2,
                 title: "第二關：黃鶴樓送孟浩然之廣陵",
-                imageUrl: "黃鶴樓送孟浩然之廣陵.png",
-                correctImageUrl: "黃鶴樓送孟浩然之廣陵正確圖.png",
+                imageUrl: "黃鶴樓送孟浩然之廣陵.jpg",
+                correctImageUrl: "黃鶴樓送孟浩然之廣陵正確圖.jpg",
                 desc: "故人西辭黃鶴樓，煙花三月下揚州。\n孤帆遠影碧山盡，唯見長江天際流。——李白《黃鶴樓送孟浩然之廣陵》",
                 pieceImages: [
-                    "故人西辭黃鶴樓.png", 
-                    "煙花三月下揚州.png", 
-                    "孤帆遠影碧山盡.png", 
-                    "唯見長江天際流.png" 
+                    "故人西辭黃鶴樓.jpg",
+                    "煙花三月下揚州.jpg",
+                    "孤帆遠影碧山盡.jpg",
+                    "唯見長江天際流.jpg"
                 ],
                 // 大家來找碴配置
                 mistakes: [
@@ -180,14 +180,14 @@
             {
                 id: 3,
                 title: "第三關：楓橋夜泊",
-                imageUrl: "楓橋夜泊.png",
-                correctImageUrl: "楓橋夜泊正確圖.png",
+                imageUrl: "楓橋夜泊.jpg",
+                correctImageUrl: "楓橋夜泊正確圖.jpg",
                 desc: "月落烏啼霜滿天，江楓漁火對愁眠。\n姑蘇城外寒山寺，夜半鐘聲到客船。——張繼《楓橋夜泊》",
                 pieceImages: [
-                    "月落烏啼霜滿天.png",
-                    "江楓漁火對愁眠.png",
-                    "姑蘇城外寒山寺.png",
-                    "夜半鐘聲到客船.png"
+                    "月落烏啼霜滿天.jpg",
+                    "江楓漁火對愁眠.jpg",
+                    "姑蘇城外寒山寺.jpg",
+                    "夜半鐘聲到客船.jpg"
                 ],
                 // 大家來找碴配置
                 mistakes: [
@@ -561,7 +561,7 @@
                         {/* 滿版封面背景圖 */}
                         <div className="absolute inset-0 z-0">
                             <img 
-                                src="詩眼天涯.png" 
+                                src="詩眼天涯.jpg"
                                 alt="詩眼天涯封面" 
                                 className="w-full h-full object-cover opacity-100"
                                 onError={(e) => {
@@ -618,7 +618,7 @@
                         {/* 背景圖：與封面一致 */}
                         <div className="absolute inset-0 z-0">
                             <img 
-                                src="詩眼天涯.png" 
+                                src="詩眼天涯.jpg"
                                 alt="詩眼天涯封面" 
                                 className="w-full h-full object-cover opacity-100"
                                 onError={(e) => {
@@ -700,7 +700,7 @@
                                             if (!e.target.dataset.fallback) {
                                                 e.target.dataset.fallback = 'true';
                                                 // Try alternative format
-                                                const alt = e.target.src.replace(/\.png$/i, '.PNG').replace(/\.PNG$/i, '.png');
+                                                const alt = e.target.src.replace(/\.jpg$/i, '.png');
                                                 if (alt !== e.target.src) {
                                                     e.target.src = alt;
                                                 } else {
@@ -742,7 +742,7 @@
                                             if (!e.target.dataset.fallback) {
                                                 e.target.dataset.fallback = 'true';
                                                 // Try alternative format
-                                                const alt = e.target.src.replace(/\.png$/i, '.PNG').replace(/\.PNG$/i, '.png');
+                                                const alt = e.target.src.replace(/\.jpg$/i, '.png');
                                                 if (alt !== e.target.src) {
                                                     e.target.src = alt;
                                                 } else {
