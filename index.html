@@ -140,7 +140,7 @@
                 title: "第一關：登鸛雀樓詩句排列",
                 imageUrl: "登鸛雀樓.png", 
                 correctImageUrl: "登鸛雀樓正確圖.png",
-                desc: "白日依山盡，黃河入海流。——王之渙《登鸛雀樓》",
+                desc: "白日依山盡，黃河入海流。\n欲窮千里目，更上一層樓。——王之渙《登鸛雀樓》",
                 pieceImages: [
                     "白日依山盡.png", 
                     "黃河入海流.png", 
@@ -162,7 +162,7 @@
                 title: "第二關：黃鶴樓送孟浩然之廣陵",
                 imageUrl: "黃鶴樓送孟浩然之廣陵.png",
                 correctImageUrl: "黃鶴樓送孟浩然之廣陵正確圖.png",
-                desc: "故人西辭黃鶴樓，煙花三月下揚州。——李白《黃鶴樓送孟浩然之廣陵》",
+                desc: "故人西辭黃鶴樓，煙花三月下揚州。\n孤帆遠影碧山盡，唯見長江天際流。——李白《黃鶴樓送孟浩然之廣陵》",
                 pieceImages: [
                     "故人西辭黃鶴樓.png", 
                     "煙花三月下揚州.png", 
@@ -182,7 +182,7 @@
                 title: "第三關：楓橋夜泊",
                 imageUrl: "楓橋夜泊.png",
                 correctImageUrl: "楓橋夜泊正確圖.png",
-                desc: "月落烏啼霜滿天，江楓漁火對愁眠。——張繼《楓橋夜泊》",
+                desc: "月落烏啼霜滿天，江楓漁火對愁眠。\n姑蘇城外寒山寺，夜半鐘聲到客船。——張繼《楓橋夜泊》",
                 pieceImages: [
                     "月落烏啼霜滿天.png",
                     "江楓漁火對愁眠.png",
@@ -219,6 +219,7 @@
             const [pool, setPool] = useState([]);
             const [grid, setGrid] = useState([null, null, null, null]);
             const [selectedPiece, setSelectedPiece] = useState(null); 
+            const [poemValidation, setPoemValidation] = useState(null);
             
             // gameState: video_intro(開頭影音), intro(封面), playing(拼圖中), spotting(找碴中), won(本關完全結束), end(全破)
             const [gameState, setGameState] = useState('video_intro'); 
@@ -350,6 +351,7 @@
                 setPool(shuffled);
                 setGrid([null, null, null, null]);
                 setSelectedPiece(null);
+                setPoemValidation(null);
                 setFoundMistakes([]);
                 setGameState('playing');
             };
@@ -372,7 +374,7 @@
             };
 
             const handlePoolClick = (piece) => {
-                if (gameState !== 'playing') return;
+                if (gameState !== 'playing' || poemValidation === 'correct') return;
                 
                 if (selectedPiece && selectedPiece.id === piece.id) {
                     setSelectedPiece(null);
@@ -382,7 +384,7 @@
             };
 
             const handleGridClick = (index) => {
-                if (gameState !== 'playing') return;
+                if (gameState !== 'playing' || poemValidation === 'correct') return;
 
                 const currentPieceInSlot = grid[index];
 
@@ -400,7 +402,7 @@
                     setPool(newPool);
                     setSelectedPiece(null);
 
-                    checkWin(newGrid);
+                    setPoemValidation(null);
                 } 
                 else if (currentPieceInSlot) {
                     const newGrid = [...grid];
@@ -408,23 +410,21 @@
                     const newPool = [...pool, currentPieceInSlot];
                     setGrid(newGrid);
                     setPool(newPool);
+                    setPoemValidation(null);
                 }
             };
 
-            const checkWin = (currentGrid) => {
-                const isFull = currentGrid.every(p => p !== null);
-                if (!isFull) return;
+            const verifyPoem = () => {
+                if (!grid.every(p => p !== null)) return;
+                const isCorrect = grid.every((p, index) => p.correctPos === index);
+                setPoemValidation(isCorrect ? 'correct' : 'wrong');
+            };
 
-                const isCorrect = currentGrid.every((p, index) => p.correctPos === index);
-                
-                if (isCorrect) {
-                    // 如果這關有設定找碴，進入找碴模式
-                    if (LEVELS[level].mistakes && LEVELS[level].mistakes.length > 0) {
-                        setGameState('spotting');
-                    } else {
-                        // 否則直接勝利
-                        setGameState('won');
-                    }
+            const startSpotting = () => {
+                if (LEVELS[level].mistakes && LEVELS[level].mistakes.length > 0) {
+                    setGameState('spotting');
+                } else {
+                    setGameState('won');
                 }
             };
 
@@ -483,6 +483,7 @@
             };
 
             const currentLevelData = LEVELS[level] || LEVELS[0];
+            const isPoemReady = grid.every(p => p !== null);
 
             const renderPiece = (piece, isSelected = false) => {
                 const getImagePath = (url) => {
@@ -724,8 +725,9 @@
                                     </div>
                                     
                                     {/* 詩詞賞析覆蓋層 */}
-                                    <div className="absolute top-4 left-4 right-4 bg-white/80 backdrop-blur-md p-3 rounded text-center text-sm font-bold text-stone-800 border border-stone-200">
-                                        {currentLevelData.desc}
+                                    <div className="absolute top-4 left-4 right-4 bg-white/85 backdrop-blur-md p-3 rounded text-center font-bold text-stone-800 border border-stone-200 leading-relaxed">
+                                        <div className="text-base whitespace-pre-line leading-loose">{currentLevelData.desc.split('——')[0]}</div>
+                                        <div className="text-xs text-stone-600 mt-1">——{currentLevelData.desc.split('——')[1]}</div>
                                     </div>
                                 </div>
                             ) : gameState === 'spotting' ? (
@@ -793,6 +795,7 @@
                                 </div>
                             ) : (
                                 /* 狀態：PLAYING (拼圖進行中) */
+                                <React.Fragment>
                                 <div className="grid grid-cols-2 gap-0.5 bg-stone-300 border border-stone-300">
                                     {grid.map((piece, index) => (
                                         <div 
@@ -812,21 +815,43 @@
                                         </div>
                                     ))}
                                 </div>
+                                {poemValidation && (
+                                    <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+                                        <Seal text={poemValidation === 'correct' ? '正解' : '誤也'} />
+                                    </div>
+                                )}
+                                </React.Fragment>
                             )}
                         </div>
 
                         {/* 控制按鈕 (僅在拼圖進行中顯示) */}
                         {gameState === 'playing' && (
-                            <div className="flex justify-end w-full">
+                            <div className="flex justify-end items-center gap-4 w-full">
                                 <button 
                                     onClick={resetLevel}
                                     className="text-stone-500 hover:text-stone-800 text-sm flex items-center gap-1 transition-colors"
                                 >
                                     <Icons.RotateCcw size={14} /> 重置本關
                                 </button>
+                                <button
+                                    onClick={verifyPoem}
+                                    disabled={!isPoemReady}
+                                    className={`text-sm flex items-center gap-1 transition-colors ${isPoemReady ? 'text-red-700 hover:text-red-900 font-bold' : 'text-stone-400 cursor-not-allowed'}`}
+                                >
+                                    <Icons.Award size={14} /> 驗證詩句
+                                </button>
+                                {poemValidation === 'correct' && (
+                                    <button
+                                        onClick={startSpotting}
+                                        className="bg-stone-900/90 text-white px-4 py-1.5 rounded-full hover:bg-black transition-all flex items-center gap-2 shadow-sm text-sm"
+                                    >
+                                        下一關 <Icons.ArrowRight size={16} />
+                                    </button>
+                                )}
                             </div>
                         )}
 
+                        
                         {/* 備選圖片區 (Pool) */}
                         {gameState === 'playing' && (
                             <div className="w-full space-y-2">
