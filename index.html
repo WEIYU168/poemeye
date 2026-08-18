@@ -5,9 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>詩眼天涯 - 詩畫拼圖</title>
     
-    <!-- 引入 React 和 ReactDOM (使用開發版本以確保兼容性) -->
-    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.development.js"></script>
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
     
     <!-- 引入 Babel 用於解析 JSX -->
     <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
@@ -22,6 +27,18 @@
         body {
             font-family: 'Noto Serif TC', serif;
             background-color: #f7f3e8;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body, #root {
+            min-height: 100%;
+        }
+
+        @supports (min-height: 100dvh) {
+            .min-h-screen {
+                min-height: 100dvh;
+            }
         }
 
         @keyframes stampIn {
@@ -140,7 +157,7 @@
                 title: "第一關：登鸛雀樓詩句排列",
                 imageUrl: "登鸛雀樓.jpg",
                 correctImageUrl: "登鸛雀樓正確圖.jpg",
-                desc: "白日依山盡，黃河入海流。\n欲窮千里目，更上一層樓。——王之渙《登鸛雀樓》",
+                desc: "白日依山盡，黃河入海流。\n欲窮千里目，更上一層樓。——王之渙〈登鸛雀樓〉",
                 pieceImages: [
                     "白日依山盡.jpg",
                     "黃河入海流.jpg",
@@ -162,7 +179,7 @@
                 title: "第二關：黃鶴樓送孟浩然之廣陵",
                 imageUrl: "黃鶴樓送孟浩然之廣陵.jpg",
                 correctImageUrl: "黃鶴樓送孟浩然之廣陵正確圖.jpg",
-                desc: "故人西辭黃鶴樓，煙花三月下揚州。\n孤帆遠影碧山盡，唯見長江天際流。——李白《黃鶴樓送孟浩然之廣陵》",
+                desc: "故人西辭黃鶴樓，煙花三月下揚州。\n孤帆遠影碧山盡，唯見長江天際流。——李白〈黃鶴樓送孟浩然之廣陵〉",
                 pieceImages: [
                     "故人西辭黃鶴樓.jpg",
                     "煙花三月下揚州.jpg",
@@ -182,7 +199,7 @@
                 title: "第三關：楓橋夜泊",
                 imageUrl: "楓橋夜泊.jpg",
                 correctImageUrl: "楓橋夜泊正確圖.jpg",
-                desc: "月落烏啼霜滿天，江楓漁火對愁眠。\n姑蘇城外寒山寺，夜半鐘聲到客船。——張繼《楓橋夜泊》",
+                desc: "月落烏啼霜滿天，江楓漁火對愁眠。\n姑蘇城外寒山寺，夜半鐘聲到客船。——張繼〈楓橋夜泊〉",
                 pieceImages: [
                     "月落烏啼霜滿天.jpg",
                     "江楓漁火對愁眠.jpg",
@@ -292,6 +309,20 @@
                 if (gameState !== 'intro' && gameState !== 'video_intro') {
                     loadLevel(level);
                 }
+            }, [level]);
+
+            useEffect(() => {
+                const levelData = LEVELS[level];
+                if (!levelData) return;
+                [
+                    levelData.imageUrl,
+                    levelData.correctImageUrl,
+                    ...(levelData.pieceImages || [])
+                ].filter(Boolean).forEach((url) => {
+                    const img = new Image();
+                    img.decoding = 'async';
+                    img.src = encodeURI(url);
+                });
             }, [level]);
 
             const startGame = () => {
@@ -561,9 +592,10 @@
                         {/* 滿版封面背景圖 */}
                         <div className="absolute inset-0 z-0">
                             <img 
-                                src="詩眼天涯.jpg"
+                                src="詩眼天涯.jpg" 
                                 alt="詩眼天涯封面" 
                                 className="w-full h-full object-cover opacity-100"
+                                decoding="async"
                                 onError={(e) => {
                                     if (e.target.dataset.fallback !== 'tried') {
                                         e.target.dataset.fallback = 'tried';
@@ -587,7 +619,7 @@
                             <div>
                                 <button 
                                     onClick={startGame}
-                                    className="bg-stone-100/90 text-stone-900 px-16 py-5 rounded-full text-2xl hover:bg-white hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center gap-3 mx-auto tracking-widest font-bold backdrop-blur-sm"
+                                    className="bg-stone-100/90 text-stone-900 px-10 sm:px-16 py-4 sm:py-5 rounded-full text-xl sm:text-2xl hover:bg-white hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center gap-3 mx-auto tracking-widest font-bold backdrop-blur-sm"
                                 >
                                     <Icons.Play size={32} fill="currentColor" /> 遊戲開始
                                 </button>
@@ -618,9 +650,10 @@
                         {/* 背景圖：與封面一致 */}
                         <div className="absolute inset-0 z-0">
                             <img 
-                                src="詩眼天涯.jpg"
+                                src="詩眼天涯.jpg" 
                                 alt="詩眼天涯封面" 
                                 className="w-full h-full object-cover opacity-100"
+                                decoding="async"
                                 onError={(e) => {
                                     if (e.target.dataset.fallback !== 'tried') {
                                         e.target.dataset.fallback = 'tried';
@@ -675,12 +708,12 @@
                     </header>
 
                     {/* 修改 max-w-lg 為 max-w-4xl 以放大整體區域 */}
-                    <main className="flex-1 flex flex-col items-center p-4 max-w-4xl mx-auto w-full z-10 gap-6">
+                    <main className="flex-1 flex flex-col items-center p-3 sm:p-4 max-w-4xl mx-auto w-full z-10 gap-4 sm:gap-6">
                         
                         {/* 標題區 */}
                         <div className="text-center w-full">
-                            <h2 className="text-2xl font-bold text-stone-800 mb-1">{currentLevelData.title}</h2>
-                            <p className="text-xl text-stone-600 font-bold font-sans">
+                            <h2 className="text-xl sm:text-2xl font-bold text-stone-800 mb-1">{currentLevelData.title}</h2>
+                            <p className="text-base sm:text-xl text-stone-600 font-bold font-sans">
                                 {gameState === 'spotting' ? `拼圖完成！請在圖中找出 ${currentLevelData.mistakes.length} 個錯誤之處` : "請將下方破碎唐詩畫面依序置入對應位置以修復詩作"}
                             </p>
                         </div>
@@ -696,6 +729,7 @@
                                         src={currentLevelData.correctImageUrl || currentLevelData.imageUrl} 
                                         alt="Complete" 
                                         className="w-full h-full object-cover bg-stone-200"
+                                        decoding="async"
                                         onError={(e) => {
                                             if (!e.target.dataset.fallback) {
                                                 e.target.dataset.fallback = 'true';
@@ -725,8 +759,8 @@
                                     </div>
                                     
                                     {/* 詩詞賞析覆蓋層 */}
-                                    <div className="absolute top-4 left-4 right-4 bg-white/85 backdrop-blur-md p-3 rounded text-center font-bold text-stone-800 border border-stone-200 leading-relaxed">
-                                        <div className="text-base whitespace-pre-line leading-loose">{currentLevelData.desc.split('——')[0]}</div>
+                                    <div className="absolute top-3 sm:top-4 left-3 sm:left-4 right-3 sm:right-4 bg-white/85 backdrop-blur-md p-2.5 sm:p-3 rounded text-center font-bold text-stone-800 border border-stone-200 leading-relaxed">
+                                        <div className="text-sm sm:text-base whitespace-pre-line leading-loose">{currentLevelData.desc.split('——')[0]}</div>
                                         <div className="text-xs text-stone-600 mt-1">——{currentLevelData.desc.split('——')[1]}</div>
                                     </div>
                                 </div>
@@ -737,6 +771,7 @@
                                         src={currentLevelData.imageUrl} 
                                         alt="Spot Difference" 
                                         className="w-full h-full object-cover bg-stone-200"
+                                        decoding="async"
                                         onClick={handleSpottingClick}
                                         onError={(e) => {
                                             if (!e.target.dataset.fallback) {
@@ -774,7 +809,7 @@
                                                 />
                                                 {/* 說明文字框 */}
                                                 <div 
-                                                    className="absolute text-white bg-black/80 px-4 py-3 rounded-lg text-base font-bold border border-white/30 shadow-lg whitespace-nowrap z-50 animate-fade-in pointer-events-none"
+                                                    className="absolute text-white bg-black/80 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm sm:text-base font-bold border border-white/30 shadow-lg max-w-[82vw] whitespace-normal z-50 animate-fade-in pointer-events-none"
                                                     style={{
                                                         left: `${mistake.x}%`,
                                                         top: `${mistake.y}%`,
@@ -801,7 +836,7 @@
                                         <div 
                                             key={`slot-${index}`}
                                             onClick={() => handleGridClick(index)}
-                                            className={`aspect-video bg-stone-100 relative flex items-center justify-center cursor-pointer overflow-hidden transition-colors
+                                            className={`aspect-video bg-stone-100 relative flex items-center justify-center cursor-pointer overflow-hidden transition-colors touch-manipulation
                                                 ${!piece && selectedPiece ? 'hover:bg-yellow-50/50' : ''}
                                             `}
                                         >
@@ -826,24 +861,24 @@
 
                         {/* 控制按鈕 (僅在拼圖進行中顯示) */}
                         {gameState === 'playing' && (
-                            <div className="flex justify-end items-center gap-4 w-full">
+                            <div className="flex flex-wrap justify-center sm:justify-end items-center gap-3 sm:gap-4 w-full">
                                 <button 
                                     onClick={resetLevel}
-                                    className="text-stone-500 hover:text-stone-800 text-sm flex items-center gap-1 transition-colors"
+                                    className="min-h-10 text-stone-500 hover:text-stone-800 text-sm flex items-center gap-1 transition-colors px-2"
                                 >
                                     <Icons.RotateCcw size={14} /> 重置本關
                                 </button>
                                 <button
                                     onClick={verifyPoem}
                                     disabled={!isPoemReady}
-                                    className={`text-sm flex items-center gap-1 transition-colors ${isPoemReady ? 'text-red-700 hover:text-red-900 font-bold' : 'text-stone-400 cursor-not-allowed'}`}
+                                    className={`min-h-10 text-sm flex items-center gap-1 transition-colors px-2 ${isPoemReady ? 'text-red-700 hover:text-red-900 font-bold' : 'text-stone-400 cursor-not-allowed'}`}
                                 >
                                     <Icons.Award size={14} /> 驗證詩句
                                 </button>
                                 {poemValidation === 'correct' && (
                                     <button
                                         onClick={startSpotting}
-                                        className="bg-stone-900/90 text-white px-4 py-1.5 rounded-full hover:bg-black transition-all flex items-center gap-2 shadow-sm text-sm"
+                                        className="min-h-10 bg-stone-900/90 text-white px-4 py-1.5 rounded-full hover:bg-black transition-all flex items-center gap-2 shadow-sm text-sm"
                                     >
                                         下一關 <Icons.ArrowRight size={16} />
                                     </button>
@@ -856,12 +891,12 @@
                         {gameState === 'playing' && (
                             <div className="w-full space-y-2">
                                 <div className="text-stone-500 text-xs font-sans ml-1">吉光片羽：</div>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     {pool.map((piece) => (
                                         <div 
                                             key={piece.id}
                                             onClick={() => handlePoolClick(piece)}
-                                            className="cursor-pointer group relative flex flex-col items-center"
+                                            className="cursor-pointer group relative flex flex-col items-center touch-manipulation"
                                         >
                                             {renderPiece(piece, selectedPiece && selectedPiece.id === piece.id)}
                                             
